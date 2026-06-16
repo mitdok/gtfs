@@ -37,13 +37,6 @@ export function exportToZip(feed: Feed, options: ExportOptions = {}): Uint8Array
   for (const name of Object.keys(files).sort()) {
     entries[name] = strToU8(files[name]!);
   }
-  if (!options.only) {
-    for (const [name, bytes] of [...feed.rawFiles.entries()].sort(([a], [b]) =>
-      a.localeCompare(b),
-    )) {
-      if (!entries[name]) entries[name] = bytes;
-    }
-  }
   // 決定性のため mtime を固定。ZIP の有効範囲は 1980-2099 のため 1980-01-01 を使う。
   const FIXED_MTIME = Date.UTC(1980, 0, 1);
   return zipSync(entries, { level: 6, mtime: FIXED_MTIME });

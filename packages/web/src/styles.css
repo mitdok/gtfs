@@ -85,33 +85,11 @@ input.time-cell.bad { background: #ffe5e9; border-color: #d7263d; }
 
 /* 検証ビュー */
 .validation-view { flex: 1; overflow: auto; padding: 16px; background: #fff; }
-.profile-panel {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(180px, 360px) auto;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 8px;
-  padding: 12px;
-  border: 1px solid #d8dee4;
-  border-radius: 6px;
-  background: #f6f8fa;
-}
-.profile-title { font-weight: 700; }
-.profile-note { margin-top: 2px; color: #57606a; font-size: 12px; }
-.profile-notes { margin: 0 0 16px; padding-left: 20px; color: #57606a; font-size: 12px; }
-.meter { height: 10px; border-radius: 999px; background: #d8dee4; overflow: hidden; }
-.meter span { display: block; height: 100%; background: #1f6feb; }
-.validation-view .summary { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+.validation-view .summary { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
 .validation-view .badge { color: #fff; background: #888; }
-.validation-view button.badge { border: 0; }
-.validation-view .badge.active { outline: 2px solid #24292f; outline-offset: 1px; }
 .ok-note { color: #2ea043; font-weight: 600; }
 .err-note { color: #d7263d; }
 table.issues td, table.issues th { white-space: normal; }
 tr.error td:first-child { color: #d7263d; font-weight: 600; }
 tr.warning td:first-child { color: #b07d10; font-weight: 600; }
 .all-clear { color: #2ea043; }
-
-@media (max-width: 720px) {
-  .profile-panel { grid-template-columns: 1fr; }
-}

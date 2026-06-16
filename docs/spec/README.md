@@ -18,6 +18,8 @@
 | 07 | [realtime](./07-realtime.md) | GTFS-RT（リアルタイム）配信設計 |
 | 08 | [tech-roadmap](./08-tech-roadmap.md) | 技術選定・アーキテクチャ・段階リリース計画 |
 | 09 | [basemap](./09-basemap.md) | 自前ベースマップ（MapLibre地図基盤）の要件・データ・配信 |
+| 10 | [gtfs-compliance](./10-gtfs-compliance.md) | GTFS/GTFS-JP準拠プロファイル・要件表・公開ゲート |
+| 11 | [release-acceptance](./11-release-acceptance.md) | 最終OK条件・検収シナリオ・リリース判定 |
 
 ## プロジェクトの立ち位置
 
@@ -31,8 +33,11 @@
 4. **公開URLの安定配信**: 生成した `gtfs.zip` を版管理し、安定したフィードURL（最新版エイリアス）で常時配信する。
 5. **静的と動的の分離**: GTFS-JP（静的）とGTFS-RT（動的）はデータソース・配信経路を分離し、GTFS-RTは後続フェーズで段階導入する。
 6. **地図は自前MapLibre地図基盤を疎結合利用**: 停留所・shape編集は自前のMapLibre地図基盤を「地図アダプタ」越しに使う。地図仕様が未確定でも編集機能を先行実装でき、地図が無い環境でも数値編集で成立する（[02](./02-requirements.md) F-10 / [04](./04-screens.md) 4.4）。
+7. **準拠要件はプロファイルで分離**: GTFS公式仕様、GTFS-JP v4、旧v3互換、Google Maps申請向け品質ゲートを混同せず、[10-gtfs-compliance](./10-gtfs-compliance.md) のプロファイル要件表で管理する。
+8. **最終OKは検収で判定**: 仕様書の記述だけで準拠を宣言せず、[11-release-acceptance](./11-release-acceptance.md) の公式仕様ロック、生成zip検証、実フィード回帰、公開URL検収をすべて満たした版のみリリース可能とする。
 
 ## ステータス
 
-- 版: Draft 0.2（GTFS-JP v4・GTFSデータリポジトリ連携・Flex/Fares v2動向を反映）
-- 最終更新: 2026-06-11
+- 版: Draft 0.4（最終OK条件・公式仕様ロック・検収ゲートを追加）
+- 最終更新: 2026-06-12
+- 実装の到達状況は [`../STATUS.md`](../STATUS.md) を参照（コア検証・v3→v4移行・Shift_JIS取込まで実装済み）。

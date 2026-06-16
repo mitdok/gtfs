@@ -5,17 +5,22 @@ GTFS-JP（v4）/ GTFS-RT 形式の公開用オープンデータを、取込・�
 
 - **OSS＋コミュニティサポート**を中核とし、SaaS提供と自治体オンプレ運用の双方を可能にする。
 - 仕様書は [`docs/spec/`](./docs/spec/README.md) を参照。
+- 実装の進捗は [`docs/STATUS.md`](./docs/STATUS.md)、変更履歴は [`CHANGELOG.md`](./CHANGELOG.md) を参照。
 
 > 本プロジェクトは、西沢明氏が無償公開した「西沢ツール」が日本のバスオープンデータ普及に果たした功績を出発点とし、その志をOSSとコミュニティで引き継ぐことを目的とする。
 
 ## リポジトリ構成
 
 ```
-docs/spec/        仕様書一式
+docs/
+  spec/           仕様書一式（01〜11章）
+  STATUS.md       仕様 ⇄ 実装の対応表（実装進捗）
+CHANGELOG.md      変更履歴
 packages/
-  core/           GTFS エンジン（取込・検証・出力。フレームワーク非依存・純TS）
+  core/           GTFS エンジン（取込・検証・移行・出力。フレームワーク非依存・純TS）
   web/            Web UI（React + MapLibre。取込・停留所地図編集・ダイヤ表・検証）
   （今後）api/     バックエンドAPI（Node/TS + Postgres。永続化・版管理）
+gtfs-tmp/         作業用スクラッチ・過去スナップショット（Git管理外）
 ```
 
 ## 開発

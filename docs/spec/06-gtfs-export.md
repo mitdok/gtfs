@@ -2,44 +2,45 @@
 
 ## 6.1 出力プロファイル
 
-出力は「プロファイル」で切替える。ファイル/項目定義はバージョン定義テーブルで設定駆動とし、仕様改定に追従する。
+出力は「プロファイル」で切替える。GTFS公式仕様、GTFS-JP v4、旧GTFS-JP v3互換、Google Maps申請向け品質ゲートは同一ではないため、ファイル/項目定義は [10-gtfs-compliance](./10-gtfs-compliance.md) のプロファイル要件表を根拠に設定駆動で管理する。
 
 | プロファイル | 説明 |
 |--------------|------|
-| `gtfs-jp-v4` | 公共交通運行情報標準データ仕様（GTFS-JP）v4（2025年度改訂・GTFS-JPアップデートプロジェクト）。国際標準との整合が強化され、**Google Mapsのデータ受入基準に基づく必須区分**を持つ。**既定** |
-| `gtfs-jp-v3` | 旧・標準的なバス情報フォーマット 第3版系。既存フィード・既存ツールとの互換用（レガシー）。 |
-| `gtfs-base` | 国際標準GTFSのみ（日本拡張なし）。海外ツール検証用。 |
+| `gtfs-base` | 国際標準GTFS Scheduleの最小準拠。海外ツール検証・基本互換用。 |
+| `gtfs-jp-v4` | 公共交通運行情報標準データ仕様（GTFS-JP）v4ネイティブ出力。**既定**。 |
+| `gtfs-jp-v3-legacy` | 旧・標準的なバス情報フォーマット第3版系。既存フィード・既存ツールとの互換用。 |
+| `google-transit-ready` | Google Maps申請向けの品質ゲート。GTFS公式要件に実務上の必須・推奨を重ねる。 |
 
-> **v4対応の方針**: v4では利用の少ないGTFS-JP独自ファイル・項目が標準仕様から削除され、国際標準仕様の全ファイルが取り込まれた。本サービスは項目定義をプロファイル（バージョン定義テーブル）で持つため、v3→v4の差分は**プロファイル定義の差し替え**で吸収する。v3取込→v4出力のマイグレーション（独自項目の落とし込み・警告）もインポータで支援する。
+> **v4対応の方針**: v4ネイティブ出力では、国際標準GTFSに取り込まれたファイル・項目を優先する。`agency_jp.txt`、`routes_jp.txt`、`office_jp.txt` 等の旧GTFS-JP由来ファイルは、v4本体要件とは分離し、`gtfs-jp-v3-legacy`または互換オプションとして扱う。v3取込→v4出力のマイグレーションでは、v4で表現可能な項目へ移行し、移行不能項目はwarningとして表示する。
 
-## 6.2 出力ファイル一覧（gtfs-jp系・代表）
+> **Google向け品質ゲート**: Google Maps申請上の実務的必須項目は、GTFS公式のRequiredとは混同しない。`google-transit-ready`で `feed_info.txt`、サービス有効期間、shape、headsign、安定ID等の品質ルールを追加検証する。
 
-> 下表はv3系を基準とした代表構成。**v4では独自ファイル（`*_jp.txt`等）の整理・国際標準ファイルの全面採用が行われており、ファイル・項目の要否はプロファイル定義（バージョン定義テーブル）に従う**。実装時はv4仕様書（国交省公開）の要否表を取り込むこと。
+## 6.2 出力ファイル一覧（MVP）
+
+MVPでは固定路線バスの静的GTFS-JP作成・公開を対象にし、次のファイルを優先実装する。プロファイル別の正確な要否は [10.3 ファイル要件](./10-gtfs-compliance.md#103-ファイル要件) に従う。
 
 凡例: ◎=必須, ○=条件付必須/推奨, △=任意
 
 | ファイル | 区分 | 生成元 |
 |----------|------|--------|
 | agency.txt | ◎ | agencies |
-| agency_jp.txt | ○ | agencies（拡張項目） |
 | stops.txt | ◎ | stops |
 | routes.txt | ◎ | routes |
-| routes_jp.txt | ○ | routes（拡張項目） |
 | trips.txt | ◎ | trips（pattern経由でroute/shape/direction導出） |
-| office_jp.txt | △ | offices |
-| pattern_jp.txt | △ | patterns（※プロファイルで採用時） |
 | stop_times.txt | ◎ | trips × pattern_stops（override適用後） |
-| calendar.txt | ◎ | services |
+| calendar.txt | ○ | services |
 | calendar_dates.txt | ○ | service_exceptions |
-| fare_attributes.txt | ○ | fare_attributes |
-| fare_rules.txt | ○ | fare_rules |
-| shapes.txt | ○ | shapes / shape_points |
-| frequencies.txt | △ | frequencies |
-| transfers.txt | △ | transfers |
 | feed_info.txt | ◎ | feed_info |
-| translations.txt | ○ | translations（停留所名の読み等） |
+| translations.txt | ◎ | translations（停留所名の読み等） |
+| fare_attributes.txt | ◎ | fare_attributes（Fares v1。無償交通でも出力） |
+| fare_rules.txt | ○ | fare_rules（均一運賃以外で必須） |
+| shapes.txt | ○ | shapes / shape_points（フリー乗降等では必須、定路線では推奨） |
+| attributions.txt | ○ | attributions（データ作成者・運行事業者・公的組織） |
+| frequencies.txt | △ | frequencies |
+| transfers.txt | ○ | transfers |
+| agency_jp.txt / routes_jp.txt / office_jp.txt / pattern_jp.txt | △ | v3互換・移行保持用。v4ネイティブ必須ではない |
 
-> 必須/条件付の細目はGTFS-JP仕様の版に従い、バージョン定義テーブルで管理する。実装時に最新仕様の項目要否表を取り込む。
+> `calendar.txt` と `calendar_dates.txt` はGTFS上「いずれか/条件付き必須」の関係である。MVPでは週次運行を`calendar.txt`、例外日を`calendar_dates.txt`に出す運用を標準とする。
 
 ## 6.3 主要マッピング
 
@@ -111,6 +112,7 @@ base = trip.start_time_sec
 - 生成zipに対し、MobilityData Canonical GTFS Validator を**内部実行**（Java別プロセス連携）し、国際標準準拠の権威ある最終チェックを行う。
 - 結果を取り込んで S-13 に統合表示。
 - 役割分担: **層1・層2＝自前実装**（編集統合・ディープリンク・GTFS-JP固有ルール）、**層3＝標準バリデータ**（標準準拠のお墨付き）。標準バリデータはGTFS-JP拡張を検証しないため、層1・2は必須。技術的背景は [08-tech-roadmap](./08-tech-roadmap.md) 8.2.1。
+- 検証結果には、実行プロファイル、標準バリデータ名・バージョン、実行日時、対象版、サマリ、issuesを保存する。詳細は [10.7](./10-gtfs-compliance.md#107-自前検証と標準バリデータ)。
 
 ### 公開ゲート
 - `error` が1件でもあれば版作成/公開を不可。
@@ -120,5 +122,5 @@ base = trip.start_time_sec
 ## 6.6 互換性・将来対応
 - GTFS-JP仕様改定（項目追加・必須化）に対し、プロファイル定義の追加で対応（コード改修を最小化）。v3→v4はこの仕組みの最初の適用例。
 - 標準GTFSのみ出力（`gtfs-base`）で海外ツールとの相互運用を担保。
-- **GTFS-Flex**（オンデマンド交通。国際標準に正式採択済み・GTFS-JP v4文書体系に拡張解説あり）、**GTFS-Fares v2**（複雑運賃。rider_categories等が採択済み）はフェーズ3でプロファイル拡張として対応する（[08](./08-tech-roadmap.md) 8.5）。
-- Google Mapsのデータ受入基準（v4の必須区分の根拠）への適合を検証ルールに含め、申請時の手戻りを減らす。
+- **GTFS-Flex**（オンデマンド交通）と**GTFS-Fares v2**（複雑運賃）はフェーズ3でプロファイル拡張として対応する。採用時点のGTFS Schedule Reference、GTFS-JP文書体系、標準バリデータ対応状況を確認して仕様ロックを追加する（[08](./08-tech-roadmap.md) 8.5）。
+- Google Maps申請向けの実務品質は`google-transit-ready`で扱い、GTFS公式仕様やGTFS-JP v4本体要件とは分離して検証する。

@@ -6,6 +6,8 @@ export * from "./model.js";
 export * from "./csv.js";
 export * from "./time.js";
 export * from "./profile.js";
+export * from "./encoding.js";
 export * from "./importer.js";
+export * from "./migration.js";
 export * from "./validator.js";
 export * from "./exporter.js";

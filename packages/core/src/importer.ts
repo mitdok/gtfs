@@ -1,11 +1,18 @@
 /**
  * GTFS zip の取込: zip バイト列 → 内部フィードモデル。
- * - UTF-8 / Shift_JIS（BOM/コード）の差はまず UTF-8 を前提（Shift_JIS 対応は後続）。
- * - *.txt は CSV テーブル化し、v4 の locations.geojson 等は rawFiles として保持する。
+ * - 文字コードは UTF-8 / Shift_JIS を自動判定し、内部は UTF-8 へ正規化（仕様 02 章 F-2-5）。
+ *   `options.encoding` で明示指定も可能。
+ * - zip 直下の *.txt を対象（サブフォルダ内も拡張子一致で拾う）。
  */
-import { unzipSync, strFromU8 } from "fflate";
+import { unzipSync } from "fflate";
 import { parseCsv } from "./csv.js";
+import { decodeText, type GtfsEncoding } from "./encoding.js";
 import { createFeed, setTable, type Feed } from "./model.js";
+
+export interface ImportOptions {
+  /** 文字コードを明示指定する。未指定時は UTF-8/Shift_JIS を自動判定。 */
+  encoding?: GtfsEncoding;
+}
 
 export interface ImportResult {
   feed: Feed;
@@ -16,31 +23,31 @@ export interface ImportResult {
 }
 
 /** zip バイト列から取込。 */
-export function importGtfsZip(zip: Uint8Array): ImportResult {
+export function importGtfsZip(zip: Uint8Array, options: ImportOptions = {}): ImportResult {
   const entries = unzipSync(zip);
-  return importEntries(entries);
+  return importEntries(entries, options);
 }
 
 /** ファイル名→バイト列 のマップから取込（テスト/再利用用）。 */
-export function importEntries(entries: Record<string, Uint8Array>): ImportResult {
+export function importEntries(
+  entries: Record<string, Uint8Array>,
+  options: ImportOptions = {},
+): ImportResult {
   const feed = createFeed();
   const importedFiles: string[] = [];
   const warnings: string[] = [];
 
   for (const [path, bytes] of Object.entries(entries)) {
+    if (!path.toLowerCase().endsWith(".txt")) continue;
     // ディレクトリエントリ等を除外
     if (bytes.length === 0 && path.endsWith("/")) continue;
-    if (!path.toLowerCase().endsWith(".txt")) {
-      if (path.toLowerCase().endsWith(".geojson") || path.toLowerCase().endsWith(".json")) {
-        feed.rawFiles.set(path, bytes);
-        importedFiles.push(path);
-      }
-      continue;
-    }
 
     const base = baseName(path);
-    const text = strFromU8(bytes);
-    const { columns, rows } = parseCsv(text);
+    const decoded = decodeText(bytes, options.encoding);
+    if (decoded.encoding === "shift_jis") {
+      warnings.push(`${path}: Shift_JIS と判定し UTF-8 へ変換しました`);
+    }
+    const { columns, rows } = parseCsv(decoded.text);
     if (columns.length === 0) {
       warnings.push(`${path}: 空ファイルのためスキップ`);
       continue;

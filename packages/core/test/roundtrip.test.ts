@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { unzipSync, strToU8 } from "fflate";
 import { importEntries, importGtfsZip } from "../src/importer.js";
 import { exportToFiles, exportToZip } from "../src/exporter.js";
 import { getRows } from "../src/model.js";
@@ -41,20 +40,5 @@ describe("import → export ラウンドトリップ", () => {
     const a = exportToZip(feed);
     const b = exportToZip(feed);
     expect(Buffer.from(a).equals(Buffer.from(b))).toBe(true);
-  });
-
-  it("locations.geojson を raw file として保持して再出力する", () => {
-    const entries = {
-      ...sampleEntries(),
-      "locations.geojson": strToU8('{"type":"FeatureCollection","features":[]}'),
-    };
-    const { feed } = importEntries(entries);
-    expect(feed.rawFiles.has("locations.geojson")).toBe(true);
-
-    const zip = exportToZip(feed);
-    const files = unzipSync(zip);
-    expect(Buffer.from(files["locations.geojson"]!).toString("utf8")).toBe(
-      '{"type":"FeatureCollection","features":[]}',
-    );
   });
 });

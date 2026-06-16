@@ -39,6 +39,7 @@ Project      1───* Service             （運行区分）
 Project      1───* FareAttribute 1──* FareRule
 Project      1───* Office              （営業所 office_jp）
 Project      1───1 FeedInfo
+Project      1───* Attribution         （attributions.txt）
 Agency       1───* Route
 Route        1───* Pattern
 Pattern      1───* PatternStop *───1 Stop
@@ -80,7 +81,7 @@ Any entity   1───* Translation         （翻訳: テーブル名+キー+�
 | name | text | | 表示名 |
 | feed_slug | text | U(org内) | 公開URLに使う識別子 |
 | default_lang | text | | 既定言語（例: ja） |
-| gtfs_profile | text | | 出力プロファイル（gtfs-jp-v4 / gtfs-jp-v3 / gtfs-base 等） |
+| gtfs_profile | text | | 出力プロファイル（gtfs-jp-v4 / gtfs-jp-v3-legacy / gtfs-base / google-transit-ready 等） |
 | license | text | N | 推奨ライセンス（CC-BY等） |
 | status | text | | active/archived |
 
@@ -101,7 +102,7 @@ Any entity   1───* Translation         （翻訳: テーブル名+キー+�
 
 > 編集中の「作業データ」は後述の各マスタ/ダイヤテーブル（ライブ状態）。`feed_revisions` は確定済スナップショットを表す。実装上はライブ編集テーブル＋確定時スナップショットの二層構成とする（[08-tech-roadmap](./08-tech-roadmap.md) 参照）。
 
-### agencies *（agency.txt / agency_jp.txt）
+### agencies *（agency.txt / v3互換時 agency_jp.txt）
 | カラム | 型 | 制約 | 説明 |
 |--------|----|------|------|
 | id | UUID | PK | |
@@ -114,7 +115,7 @@ Any entity   1───* Translation         （翻訳: テーブル名+キー+�
 | phone | text | N | agency_phone |
 | fare_url | text | N | |
 | email | text | N | |
-| // 以下 agency_jp 拡張 | | | |
+| // 以下 agency_jp 拡張（v3互換・移行保持用） | | | |
 | official_name | text | N | 正式名称 |
 | zip_number | text | N | 郵便番号 |
 | address | text | N | 住所 |
@@ -139,7 +140,7 @@ Any entity   1───* Translation         （翻訳: テーブル名+キー+�
 | platform_code | text | N | のりば番号 |
 | wheelchair_boarding | int | N | |
 
-### routes *（routes.txt / routes_jp.txt）
+### routes *（routes.txt / v3互換時 routes_jp.txt）
 | カラム | 型 | 制約 | 説明 |
 |--------|----|------|------|
 | id | UUID | PK | |
@@ -153,7 +154,7 @@ Any entity   1───* Translation         （翻訳: テーブル名+キー+�
 | color | text | N | route_color |
 | text_color | text | N | |
 | sort_order | int | N | |
-| // routes_jp 拡張 | | | |
+| // routes_jp 拡張（v3互換・移行保持用） | | | |
 | update_date | date | N | ダイヤ改正日 |
 | origin_stop | text | N | 起点 |
 | via | text | N | 経過地 |
@@ -238,11 +239,14 @@ GTFSの `fare_attributes.txt` / `fare_rules.txt` に準拠（price, currency, pa
 ### shapes *（shapes.txt）
 `shapes(id, project_id, gtfs_id)` ＋ `shape_points(shape_id, sequence, lat, lon, dist_traveled)`。
 
-### offices（office_jp.txt）
+### offices（office_jp.txt / v3互換・移行保持用）
 `offices(id, project_id, gtfs_id, name, url, phone)`。
 
 ### feed_info *（feed_info.txt）
 `feed_info(project_id, publisher_name, publisher_url, lang, start_date, end_date, version, contact_email, contact_url)`。
+
+### attributions *（attributions.txt）
+`attributions(id, project_id, gtfs_id, agency_id, route_id, trip_id, organization_name, is_producer, is_operator, is_authority, attribution_url, attribution_email, attribution_phone)`。
 
 ### translations *（translations.txt）
 | カラム | 型 | 説明 |
@@ -262,7 +266,48 @@ GTFSの `fare_attributes.txt` / `fare_rules.txt` に準拠（price, currency, pa
 ### transfers（任意 / transfers.txt）
 `transfers(from_stop_id, to_stop_id, transfer_type, min_transfer_time)`。
 
-## 3.5 GTFS-RT 関連（フェーズ2、概要）
+## 3.5 GTFS出力マッピング
+
+出力時は、内部正規化モデルからGTFSファイルへ次のように射影する。プロファイル別の要否・公開ゲートは [10-gtfs-compliance](./10-gtfs-compliance.md) に従う。
+
+| 内部モデル | GTFS出力 | 備考 |
+|------------|----------|------|
+| `agencies.gtfs_id` | `agency.agency_id` | 複数agency時は必須。単一でも安定IDとして推奨 |
+| `agencies.name/url/timezone/lang/phone/fare_url/email` | `agency.txt` | `agency_timezone`はIANA TZ |
+| `agencies.official_name`等 | `agency_jp.txt` | `gtfs-jp-v3-legacy`または互換オプション時のみ |
+| `stops.gtfs_id/name/lat/lon/...` | `stops.txt` | `parent_station`は親stopの`gtfs_id`へ変換 |
+| `stops.name_kana` | `translations.txt` | `table_name=stops`, `field_name=stop_name`, `language=ja-Hrkt` |
+| `routes.gtfs_id/short_name/long_name/type/...` | `routes.txt` | `agency_id`はagencyの`gtfs_id`へ変換 |
+| `routes.origin_stop/via/destination_stop` | `routes_jp.txt` | `gtfs-jp-v3-legacy`または互換オプション時のみ |
+| `patterns.direction_id/headsign/shape_id` | `trips.txt` | 各tripへ既定値として継承 |
+| `trips.gtfs_id/service_id/headsign/block_id/...` | `trips.txt` | `route_id`はpatternのrouteから導出 |
+| `pattern_stops + trips + stop_time_overrides` | `stop_times.txt` | `trip.start_time_sec + pattern_stop.default_offset_sec`を基本に、overrideで上書き |
+| `services` | `calendar.txt` | 曜日運行・期間 |
+| `service_exceptions` | `calendar_dates.txt` | 例外日。`exception_type`は1/2 |
+| `shapes + shape_points` | `shapes.txt` | `shape_pt_sequence`順に出力 |
+| `fare_attributes/fare_rules` | `fare_attributes.txt` / `fare_rules.txt` | Fares v1 |
+| `feed_info` | `feed_info.txt` | `google-transit-ready`では必須 |
+| `attributions` | `attributions.txt` | GTFS-JP v4で推奨。データ作成者・運行事業者・公的組織 |
+| `translations` | `translations.txt` | 読み仮名・多言語 |
+| `frequencies` | `frequencies.txt` | 等間隔運行使用時 |
+| `transfers` | `transfers.txt` | 乗換情報使用時 |
+
+### stop_times展開規則
+
+`stop_times.txt`は保存済みの全行を一次データとして持たず、原則として`trips`と`pattern_stops`から生成する。
+
+1. tripの所属patternを取得する。
+2. pattern内の`pattern_stops`を`sequence`昇順に並べる。
+3. 各pattern_stopについて、到着・発車時刻を `trip.start_time_sec + pattern_stop.default_offset_sec` で算出する。
+4. `stop_time_overrides`がある場合は、到着・発車・乗降区分を上書きする。
+5. `arrival_time` / `departure_time` はGTFS時刻文字列に変換する。24時超は`25:10:00`のように出力する。
+6. `stop_sequence`は`pattern_stops.sequence`を用いる。
+
+### v3互換項目の扱い
+
+`agency_jp.txt`、`routes_jp.txt`、`office_jp.txt`、`pattern_jp.txt`等の旧GTFS-JP由来データは、内部モデルでは保持できるが、v4ネイティブ出力の必須要件とはしない。v4へ移行可能な情報は標準GTFS項目または`translations.txt`等へ写し、移行不能な情報はwarningとして検証結果に出す。
+
+## 3.6 GTFS-RT 関連（フェーズ2、概要）
 
 詳細は [07-realtime](./07-realtime.md)。主なテーブル:
 
@@ -271,7 +316,7 @@ GTFSの `fare_attributes.txt` / `fare_rules.txt` に準拠（price, currency, pa
 - `rt_trip_updates`: 遅延・時刻変更（突合済 trip_id 参照）。
 - `rt_alerts`: 運行アラート（手動投入/外部取込、影響範囲＝route/stop/trip）。
 
-## 3.6 整合性制約（DB/アプリ両面）
+## 3.7 整合性制約（DB/アプリ両面）
 
 - `pattern_stops.sequence` はパターン内で連続・一意。
 - `trips.pattern_id` の route と `routes.agency_id` の整合。

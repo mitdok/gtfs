@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { importEntries } from "../src/importer.js";
 import { validateFeed } from "../src/validator.js";
 import { setTable, getRows } from "../src/model.js";
+import { migrateToGtfsJpV4 } from "../src/migration.js";
 import { sampleEntries, SAMPLE_FILES } from "./fixtures.js";
 import { strToU8 } from "fflate";
 
@@ -66,42 +67,28 @@ describe("validateFeed", () => {
     expect(report.issues.some((i) => i.code === "duplicate_id")).toBe(true);
   });
 
-  it("GTFS-JP v4 の必須ファイルと読み仮名を検出する", () => {
+  it("GTFS-JP v4 は公式v4必須ファイル不足を検出する", () => {
     const report = validateFeed(feedFrom(SAMPLE_FILES), { profileId: "gtfs-jp-v4" });
-    expect(
-      report.issues.some((i) => i.code === "missing_required_file" && i.entity?.id === "translations"),
-    ).toBe(true);
-    expect(
-      report.issues.some((i) => i.code === "missing_required_file" && i.entity?.id === "fare_attributes"),
-    ).toBe(true);
-    expect(
-      report.issues.some((i) => i.code === "missing_required_field" && i.entity?.id === "feed_info.feed_version"),
-    ).toBe(true);
+    expect(report.issues.some((i) => i.code === "missing_required_file" && i.entity?.id === "fare_attributes")).toBe(true);
+    expect(report.issues.some((i) => i.code === "missing_required_file" && i.entity?.id === "translations")).toBe(true);
   });
 
-  it("GTFS-JP v4 の型・期間・翻訳ルールを検出する", () => {
-    const files = {
+  it("最小GTFSをGTFS-JP v4候補へ移行できる", () => {
+    const migrated = migrateToGtfsJpV4(feedFrom(SAMPLE_FILES));
+    const report = validateFeed(migrated.feed, { profileId: "gtfs-jp-v4" });
+    expect(report.summary.errors).toBe(0);
+    expect(getRows(migrated.feed, "fare_attributes")).toHaveLength(1);
+    expect(getRows(migrated.feed, "translations")).toHaveLength(3);
+    expect(migrated.warnings.some((w) => w.code === "created_free_fare")).toBe(true);
+  });
+
+  it("GTFS-JP v4 ではv3由来のjp拡張ファイルを警告する", () => {
+    const feed = feedFrom({
       ...SAMPLE_FILES,
-      "feed_info.txt": [
-        "feed_publisher_name,feed_publisher_url,feed_lang,feed_start_date,feed_end_date,feed_version",
-        "テスト,https://example.com,en,20260401,20260405,20260401",
-        "",
-      ].join("\n"),
-      "fare_attributes.txt": [
-        "fare_id,price,currency_type,payment_method",
-        "F1,-1,JPY,0",
-        "",
-      ].join("\n"),
-      "translations.txt": [
-        "table_name,field_name,language,translation,record_id",
-        "stops,stop_name,en,Station,S1",
-        "",
-      ].join("\n"),
-    };
-    const report = validateFeed(feedFrom(files), { profileId: "gtfs-jp-v4" });
-    expect(report.issues.some((i) => i.code === "jp_feed_lang_should_be_ja")).toBe(true);
-    expect(report.issues.some((i) => i.code === "feed_period_too_short")).toBe(true);
-    expect(report.issues.some((i) => i.code === "missing_japanese_kana_translation")).toBe(true);
-    expect(report.issues.some((i) => i.code === "negative_fare_price")).toBe(true);
+      "agency_jp.txt": "agency_id,agency_official_name\ntoyo,テスト交通株式会社\n",
+    });
+    const migrated = migrateToGtfsJpV4(feed, { dropLegacyJpFiles: false });
+    const report = validateFeed(migrated.feed, { profileId: "gtfs-jp-v4" });
+    expect(report.issues.some((i) => i.code === "legacy_jp_file")).toBe(true);
   });
 });

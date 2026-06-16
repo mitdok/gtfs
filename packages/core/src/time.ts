@@ -30,3 +30,19 @@ export function secToHms(total: number): string {
 export function isValidGtfsTime(value: string): boolean {
   return TIME_RE.test(value.trim());
 }
+
+const DATE_RE = /^(\d{4})(\d{2})(\d{2})$/;
+
+/**
+ * GTFS の日付文字列（`YYYYMMDD`）として妥当か。
+ * calendar/calendar_dates/feed_info の各日付欄に用いる。月・日の範囲も検証する。
+ */
+export function isValidGtfsDate(value: string): boolean {
+  const m = DATE_RE.exec(value.trim());
+  if (!m) return false;
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > 31) return false;
+  return true;
+}

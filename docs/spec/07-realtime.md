@@ -42,7 +42,7 @@ GTFS-RTは静的GTFSの `trip_id` / `stop_id` / `route_id` を参照する。入
 
 - 各エンティティに `timestamp` を付与。古いデータは保持期間で破棄。
 - ヘッダの `FeedHeader.gtfs_realtime_version` は **2.0**、`incrementality=FULL_DATASET` を基本とする。
-- **schedule_relationship は最新仕様に追従**: 臨時便の表現に旧 `ADDED` は使わない（仕様上廃止の方向で、`NEW` / `REPLACEMENT` / `DUPLICATED` への移行が進行中）。本サービスは新しい値で出力し、外部RT中継（2-b）で旧値を受けた場合は正規化する。
+- **schedule_relationship は採用するGTFS-RT仕様版に追従**: 臨時便・置換便・複製便の表現は、実装時に採用する`gtfs-realtime.proto`の列挙値と公式移行ガイドに従う。外部RT中継（2-b）で旧表現を受けた場合は、採用仕様版に合わせて正規化する。
 - 混雑度（`OccupancyStatus`）は入力ソースが提供する場合に任意で配信する。
 - 配信前段にキャッシュ（短TTL）。アプリは生成、配信はエッジ、を分離。
 - デバッグ用にJSON版（`?format=json`）を提供。

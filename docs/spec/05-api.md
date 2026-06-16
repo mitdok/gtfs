@@ -7,10 +7,49 @@
 - バージョニング: `/api/v1`。
 - すべての書込はべき等性・楽観的ロック（`If-Match`/`updated_at`）を考慮。
 - エラーは RFC 7807（problem+json）形式。
+- import / validate / export / publish の重い処理は非同期ジョブとし、状態遷移・エラー詳細を共通形式で返す。
 
 ```
 ベースURL: https://api.<host>/api/v1
 公開配信: https://feeds.<host>/...   （CDN/オブジェクトストレージ前段、別系統）
+```
+
+### 共通ジョブ状態
+
+| 状態 | 説明 |
+|------|------|
+| `queued` | 受付済み。まだ処理開始していない |
+| `running` | 処理中 |
+| `succeeded` | 正常終了 |
+| `failed` | 失敗。`error`に詳細を持つ |
+| `canceled` | ユーザーまたはシステムにより中止 |
+
+ジョブレスポンス共通形:
+
+```jsonc
+{
+  "job_id": "...",
+  "type": "validate", // import | validate | export | publish | submit_repository
+  "status": "running",
+  "progress": { "current": 40, "total": 100, "message": "標準バリデータを実行中" },
+  "created_at": "2026-06-12T10:00:00Z",
+  "started_at": "2026-06-12T10:00:05Z",
+  "finished_at": null,
+  "result": null,
+  "error": null
+}
+```
+
+失敗時の`error`はRFC 7807に準じる:
+
+```jsonc
+{
+  "type": "https://docs.example/errors/gtfs-validator-failed",
+  "title": "GTFS validation failed",
+  "status": 422,
+  "detail": "標準バリデータでerrorが検出されました",
+  "instance": "/projects/.../validations/..."
+}
 ```
 
 ## 5.2 認証・組織
@@ -33,9 +72,48 @@
 | POST | `/projects/{project}/duplicate` | 複製（ダイヤ改正下書き等） |
 | DELETE | `/projects/{project}` | アーカイブ/削除（論理） |
 
+## 5.3.1 仕様ロック・リリース検収
+
+仕様ロックとリリース検収は、サービス全体またはデプロイ単位のメタデータとして扱う。
+
+| メソッド | パス | 説明 |
+|----------|------|------|
+| GET | `/system/spec-locks` | 採用中のGTFS/GTFS-JP/Google/validatorロック状態を取得 |
+| GET | `/system/profiles` | 利用可能な出力プロファイルと版を取得 |
+| GET | `/system/release-acceptance/latest` | 最新のリリース検収結果を取得 |
+
+`/system/spec-locks` レスポンス例:
+
+```jsonc
+{
+  "locks": [
+    {
+      "id": "GTFS_SCHEDULE_LOCK",
+      "status": "locked",
+      "source": "https://gtfs.org/documentation/schedule/reference/",
+      "source_revision": "Revised 2026-04-27",
+      "checked_at": "2026-06-12T00:00:00Z",
+      "profile_version": "2026-06-12.1"
+    },
+    {
+      "id": "GTFS_JP_V4_LOCK",
+      "status": "locked",
+      "source": "国土交通省 公共交通運行情報標準データ仕様（GTFS-JP）第4.0版",
+      "files": [
+        "commmmons_doc_007-01_ver01.pdf",
+        "commmmons_doc_007-02_ver01.pdf",
+        "commmmons_doc_007-03_ver01.pdf"
+      ],
+      "checked_at": "2026-06-12T00:00:00Z",
+      "profile_version": "2026-06-12.1"
+    }
+  ]
+}
+```
+
 ## 5.4 マスタリソース（CRUD共通形）
 
-各マスタは以下の共通CRUDを持つ。`{res}` ∈ `agencies, stops, routes, patterns, services, fares, shapes, offices, translations, frequencies, transfers`。
+各マスタは以下の共通CRUDを持つ。`{res}` ∈ `agencies, stops, routes, patterns, services, fares, shapes, offices, attributions, translations, frequencies, transfers`。
 
 | メソッド | パス | 説明 |
 |----------|------|------|
@@ -122,6 +200,25 @@
 | POST | `/projects/{project}/revisions/{rev}:submit-repository` | GTFSデータリポジトリ（gtfs-data.jp）へ登録/更新（F-7-7、連携設定要） |
 | GET | `/projects/{project}/revisions/{rev}/gtfs.zip` | 当該版の zip ダウンロード（要認証） |
 | GET | `/projects/{project}/export.zip?profile=` | 作業データから即時生成（プレビュー用） |
+
+### 版状態遷移
+
+`feed_revisions.status` は次の状態を取る。
+
+| 状態 | 説明 | 遷移元 | 遷移先 |
+|------|------|--------|--------|
+| `draft` | 版作成ジョブ中または検証前 | 作業データ | `validating`, `failed` |
+| `validating` | 自前検証・zip生成・標準バリデータ実行中 | `draft` | `validated`, `failed` |
+| `validated` | 公開可能な検証済み版 | `validating` | `published`, `superseded` |
+| `published` | 最新版エイリアスが指している公開版 | `validated`, `superseded` | `superseded` |
+| `superseded` | 過去公開版または差し替え済み版 | `published`, `validated` | `published` |
+| `failed` | 版作成または検証失敗 | `draft`, `validating` | なし |
+
+公開操作は、対象版が`validated`または`superseded`で、対象プロファイルの公開阻害errorが0件の場合のみ許可する。ロールバックは、過去に公開可能検証を通過した`superseded`版のみ対象にできる。
+
+### 検証結果メタデータ
+
+版作成時の検証結果には、[10.7](./10-gtfs-compliance.md#107-自前検証と標準バリデータ) の項目を保存する。APIでは少なくとも `profile_id`, `validator_name`, `validator_version`, `executed_at`, `summary`, `issues` を返す。
 
 ## 5.9 公開フィード配信（匿名・別系統）
 

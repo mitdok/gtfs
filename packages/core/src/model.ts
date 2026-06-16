@@ -22,12 +22,10 @@ export interface FeedTable {
 /** フィード1つ分。tables はファイル名（拡張子なし）→テーブル。 */
 export interface Feed {
   tables: Map<string, FeedTable>;
-  /** CSV テーブル化しないファイル（例: locations.geojson）をロスレス保持。 */
-  rawFiles: Map<string, Uint8Array>;
 }
 
 export function createFeed(): Feed {
-  return { tables: new Map(), rawFiles: new Map() };
+  return { tables: new Map() };
 }
 
 export function getTable(feed: Feed, name: string): FeedTable | undefined {

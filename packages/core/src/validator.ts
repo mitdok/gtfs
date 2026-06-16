@@ -6,8 +6,8 @@
  * ここでは編集UIに即時フィードバックできる軽量・自前ルールを実装する。
  */
 import { getRows, type Feed } from "./model.js";
-import { getProfile, type FieldDef, type Profile } from "./profile.js";
-import { isValidGtfsTime, hmsToSec } from "./time.js";
+import { getProfile, type Profile } from "./profile.js";
+import { isValidGtfsTime, isValidGtfsDate, hmsToSec } from "./time.js";
 
 export type Severity = "error" | "warning" | "info";
 
@@ -28,17 +28,20 @@ export interface ValidateOptions {
 }
 
 export function validateFeed(feed: Feed, options: ValidateOptions = {}): ValidationReport {
-  const profile = getProfile(options.profileId ?? "gtfs-base");
+  const profileId = options.profileId ?? "gtfs-base";
+  const profile = getProfile(profileId);
   const issues: ValidationIssue[] = [];
 
   checkRequiredFiles(feed, profile, issues);
+  checkRecommendedFiles(feed, profile, issues);
   checkRequiredFields(feed, profile, issues);
-  checkFieldValues(feed, profile, issues);
   checkUniqueIds(feed, issues);
   checkReferences(feed, issues);
   checkCoordinates(feed, issues);
   checkStopTimes(feed, issues);
-  checkGtfsJpV4Rules(feed, profile, issues);
+  checkCalendar(feed, issues);
+  checkConditionalGtfsRules(feed, issues);
+  if (profileId === "gtfs-jp-v4") checkGtfsJpV4(feed, issues);
 
   return { issues, summary: summarize(issues) };
 }
@@ -65,14 +68,11 @@ function checkRequiredFiles(feed: Feed, profile: Profile, issues: ValidationIssu
         message: `必須ファイル ${file.name}.txt がありません`,
         entity: { type: "file", id: file.name },
       });
-    }
-  }
-  for (const file of profile.files) {
-    if (file.recommended && !feed.tables.has(file.name)) {
+    } else if (file.required && feed.tables.get(file.name)?.rows.length === 0) {
       issues.push({
-        severity: "info",
-        code: "missing_recommended_file",
-        message: `推奨ファイル ${file.name}.txt がありません`,
+        severity: "error",
+        code: "empty_required_file",
+        message: `必須ファイル ${file.name}.txt にデータ行がありません`,
         entity: { type: "file", id: file.name },
       });
     }
@@ -84,6 +84,38 @@ function checkRequiredFiles(feed: Feed, profile: Profile, issues: ValidationIssu
         code: "missing_service_file",
         message: "calendar.txt または calendar_dates.txt の少なくとも一方が必要です",
         entity: { type: "file" },
+      });
+    }
+  }
+}
+
+// --- 推奨ファイル ---------------------------------------------------------
+// プロファイルの presence="recommended" は今まで未使用だった。欠落を warning にする。
+function checkRecommendedFiles(feed: Feed, profile: Profile, issues: ValidationIssue[]) {
+  for (const file of profile.files) {
+    if (file.presence === "recommended" && !feed.tables.has(file.name)) {
+      issues.push({
+        severity: "warning",
+        code: "missing_recommended_file",
+        message: `推奨ファイル ${file.name}.txt がありません`,
+        entity: { type: "file", id: file.name },
+      });
+    }
+  }
+}
+
+function checkConditionalGtfsRules(feed: Feed, issues: ValidationIssue[]) {
+  // GTFS: routes.route_short_name と route_long_name は少なくとも一方が必要。
+  for (const row of getRows(feed, "routes")) {
+    const id = (row["route_id"] ?? "").trim();
+    const shortName = (row["route_short_name"] ?? "").trim();
+    const longName = (row["route_long_name"] ?? "").trim();
+    if (shortName === "" && longName === "") {
+      issues.push({
+        severity: "error",
+        code: "missing_route_name",
+        message: `routes.txt route_id="${id}" は route_short_name または route_long_name の少なくとも一方が必要です`,
+        entity: { type: "routes", id },
       });
     }
   }
@@ -122,68 +154,6 @@ function checkRequiredFields(feed: Feed, profile: Profile, issues: ValidationIss
   }
 }
 
-// --- 値の型・列挙 ---------------------------------------------------------
-function checkFieldValues(feed: Feed, profile: Profile, issues: ValidationIssue[]) {
-  for (const file of profile.files) {
-    const table = feed.tables.get(file.name);
-    if (!table) continue;
-    for (const field of file.fields) {
-      if (!table.columns.includes(field.name)) continue;
-      for (const row of table.rows) {
-        const value = (row[field.name] ?? "").trim();
-        if (value === "") continue;
-        if (!isValidFieldValue(field, value)) {
-          issues.push({
-            severity: "error",
-            code: "invalid_field_value",
-            message: `${file.name}.txt の ${field.name} が不正です: "${value}"`,
-            entity: {
-              type: file.name,
-              id: row[primaryKeyFor(file.name)] ?? row["trip_id"] ?? "",
-              field: field.name,
-              value,
-            },
-          });
-        }
-      }
-    }
-  }
-}
-
-function isValidFieldValue(field: FieldDef, value: string): boolean {
-  if (field.type === "enum") return field.enumValues?.includes(value) ?? true;
-  if (field.type === "date") return isValidDate(value);
-  if (field.type === "url") return /^https?:\/\/\S+$/i.test(value);
-  if (field.type === "email") return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-  if (field.type === "integer") return /^-?\d+$/.test(value);
-  if (field.type === "float") return Number.isFinite(Number(value));
-  if (field.type === "currency") return /^[A-Z]{3}$/.test(value);
-  if (field.type === "language") return /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(value);
-  if (field.type === "timezone") return /^[A-Za-z]+\/[A-Za-z0-9_+\-]+(?:\/[A-Za-z0-9_+\-]+)*$/.test(value);
-  return true;
-}
-
-function isValidDate(value: string): boolean {
-  if (!/^\d{8}$/.test(value)) return false;
-  const y = Number(value.slice(0, 4));
-  const m = Number(value.slice(4, 6));
-  const d = Number(value.slice(6, 8));
-  const date = new Date(Date.UTC(y, m - 1, d));
-  return (
-    date.getUTCFullYear() === y &&
-    date.getUTCMonth() === m - 1 &&
-    date.getUTCDate() === d
-  );
-}
-
-function dateToDayNumber(value: string): number | null {
-  if (!isValidDate(value)) return null;
-  const y = Number(value.slice(0, 4));
-  const m = Number(value.slice(4, 6));
-  const d = Number(value.slice(6, 8));
-  return Math.floor(Date.UTC(y, m - 1, d) / 86_400_000);
-}
-
 // --- 主キー一意性 ---------------------------------------------------------
 const PRIMARY_KEYS: { table: string; key: string }[] = [
   { table: "agency", key: "agency_id" },
@@ -192,11 +162,6 @@ const PRIMARY_KEYS: { table: string; key: string }[] = [
   { table: "trips", key: "trip_id" },
   { table: "calendar", key: "service_id" },
   { table: "fare_attributes", key: "fare_id" },
-  { table: "levels", key: "level_id" },
-  { table: "fare_media", key: "fare_media_id" },
-  { table: "fare_products", key: "fare_product_id" },
-  { table: "areas", key: "area_id" },
-  { table: "networks", key: "network_id" },
 ];
 
 function checkUniqueIds(feed: Feed, issues: ValidationIssue[]) {
@@ -228,12 +193,11 @@ function checkReferences(feed: Feed, issues: ValidationIssue[]) {
   const routeIds = idSet(feed, "routes", "route_id");
   const tripIds = idSet(feed, "trips", "trip_id");
   const agencyIds = idSet(feed, "agency", "agency_id");
-  const fareIds = idSet(feed, "fare_attributes", "fare_id");
-  const shapeIds = idSet(feed, "shapes", "shape_id");
   const serviceIds = new Set<string>([
     ...idSet(feed, "calendar", "service_id"),
     ...idSet(feed, "calendar_dates", "service_id"),
   ]);
+  const fareIds = idSet(feed, "fare_attributes", "fare_id");
 
   // routes.agency_id -> agency （列がありかつ値が非空のときのみ）
   for (const row of getRows(feed, "routes")) {
@@ -251,10 +215,6 @@ function checkReferences(feed: Feed, issues: ValidationIssue[]) {
     const sid = (row["service_id"] ?? "").trim();
     if (sid !== "" && !serviceIds.has(sid)) {
       issues.push(ref("trips", "trip_id", row, "service_id", sid, "calendar/calendar_dates"));
-    }
-    const shapeId = (row["shape_id"] ?? "").trim();
-    if (shapeId !== "" && !shapeIds.has(shapeId)) {
-      issues.push(ref("trips", "trip_id", row, "shape_id", shapeId, "shapes"));
     }
   }
   // stop_times.trip_id -> trips, stop_times.stop_id -> stops
@@ -275,15 +235,11 @@ function checkReferences(feed: Feed, issues: ValidationIssue[]) {
       issues.push(ref("stops", "stop_id", row, "parent_station", ps, "stops"));
     }
   }
-  // fare_rules.fare_id -> fare_attributes, fare_rules.route_id -> routes
+  // fare_rules.fare_id -> fare_attributes
   for (const row of getRows(feed, "fare_rules")) {
-    const fareId = (row["fare_id"] ?? "").trim();
-    if (fareId !== "" && !fareIds.has(fareId)) {
-      issues.push(ref("fare_rules", "fare_id", row, "fare_id", fareId, "fare_attributes"));
-    }
-    const routeId = (row["route_id"] ?? "").trim();
-    if (routeId !== "" && !routeIds.has(routeId)) {
-      issues.push(ref("fare_rules", "fare_id", row, "route_id", routeId, "routes"));
+    const fid = (row["fare_id"] ?? "").trim();
+    if (fid !== "" && !fareIds.has(fid)) {
+      issues.push(ref("fare_rules", "fare_id", row, "fare_id", fid, "fare_attributes"));
     }
   }
 }
@@ -366,7 +322,27 @@ function checkStopTimes(feed: Feed, issues: ValidationIssue[]) {
     const sorted = [...list].sort(
       (a, b) => Number(a["stop_sequence"] ?? 0) - Number(b["stop_sequence"] ?? 0),
     );
-    let prev = -1;
+
+    // stop_sequence は trip 内で一意（GTFS 仕様）。重複を検出する。
+    const seenSeq = new Set<string>();
+    const dupSeq = new Set<string>();
+    for (const row of sorted) {
+      const seq = (row["stop_sequence"] ?? "").trim();
+      if (seq === "") continue;
+      if (seenSeq.has(seq)) dupSeq.add(seq);
+      else seenSeq.add(seq);
+    }
+    for (const seq of dupSeq) {
+      issues.push({
+        severity: "error",
+        code: "duplicate_stop_sequence",
+        message: `stop_times.txt trip_id="${tid}" で stop_sequence=${seq} が重複しています`,
+        entity: { type: "stop_times", id: tid, stop_sequence: seq },
+      });
+    }
+
+    // 時刻の単調性。次停留所の到着は直前停留所の「発車」以降であること（停車時間考慮）。
+    let prevDep = -1;
     for (const row of sorted) {
       const arr = (row["arrival_time"] ?? "").trim();
       const dep = (row["departure_time"] ?? "").trim();
@@ -382,7 +358,7 @@ function checkStopTimes(feed: Feed, issues: ValidationIssue[]) {
       }
       const cur = arrSec ?? depSec;
       if (cur !== null) {
-        if (prev >= 0 && cur < prev) {
+        if (prevDep >= 0 && cur < prevDep) {
           issues.push({
             severity: "error",
             code: "stop_time_decreasing",
@@ -390,80 +366,208 @@ function checkStopTimes(feed: Feed, issues: ValidationIssue[]) {
             entity: { type: "stop_times", id: tid, stop_sequence: row["stop_sequence"] },
           });
         }
-        prev = Math.max(prev, cur);
+        prevDep = Math.max(prevDep, depSec ?? cur);
       }
     }
   }
 }
 
-// --- GTFS-JP v4 固有の軽量検査 ------------------------------------------
-function checkGtfsJpV4Rules(feed: Feed, profile: Profile, issues: ValidationIssue[]) {
-  if (profile.id !== "gtfs-jp-v4") return;
+// --- カレンダー（運行区分） -------------------------------------------------
+const CALENDAR_DAY_KEYS = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+] as const;
 
-  for (const row of getRows(feed, "feed_info")) {
-    const lang = (row["feed_lang"] ?? "").trim();
-    if (lang !== "" && lang !== "ja") {
-      issues.push({
-        severity: "warning",
-        code: "jp_feed_lang_should_be_ja",
-        message: `GTFS-JP v4 では feed_info.txt の feed_lang は "ja" を設定します: "${lang}"`,
-        entity: { type: "feed_info", field: "feed_lang" },
-      });
+function checkCalendar(feed: Feed, issues: ValidationIssue[]) {
+  // calendar_dates の追加日（exception_type=1）を持つ service を把握しておく。
+  // 全曜日0の calendar でも、追加日があれば「空サービス」ではない。
+  const additiveServices = new Set<string>();
+  for (const row of getRows(feed, "calendar_dates")) {
+    if ((row["exception_type"] ?? "").trim() === "1") {
+      const sid = (row["service_id"] ?? "").trim();
+      if (sid !== "") additiveServices.add(sid);
     }
+  }
 
-    const start = dateToDayNumber((row["feed_start_date"] ?? "").trim());
-    const end = dateToDayNumber((row["feed_end_date"] ?? "").trim());
-    if (start !== null && end !== null) {
-      if (end < start) {
-        issues.push({
-          severity: "error",
-          code: "feed_period_reversed",
-          message: "feed_info.txt の feed_end_date が feed_start_date より前です",
-          entity: { type: "feed_info", field: "feed_end_date" },
-        });
-      } else {
-        const days = end - start + 1;
-        if (days <= 7) {
+  const calendar = feed.tables.get("calendar");
+  if (calendar) {
+    for (const row of calendar.rows) {
+      const sid = (row["service_id"] ?? "").trim();
+
+      for (const key of ["start_date", "end_date"] as const) {
+        const v = (row[key] ?? "").trim();
+        if (v !== "" && !isValidGtfsDate(v)) {
           issues.push({
-            severity: "warning",
-            code: "feed_period_too_short",
-            message: `GTFS-JP v4 では有効期間が7日以下のデータセットは作成しないこととされています: ${days}日`,
-            entity: { type: "feed_info", field: "feed_end_date", days },
-          });
-        } else if (days < 30) {
-          issues.push({
-            severity: "info",
-            code: "feed_period_short",
-            message: `GTFS-JP v4 では可能であれば有効期間30日以上が望ましいです: ${days}日`,
-            entity: { type: "feed_info", field: "feed_end_date", days },
+            severity: "error",
+            code: "invalid_date_format",
+            message: `calendar.txt service_id="${sid}" の ${key} が YYYYMMDD ではありません: "${v}"`,
+            entity: { type: "calendar", id: sid, field: key },
           });
         }
+      }
+      const start = (row["start_date"] ?? "").trim();
+      const end = (row["end_date"] ?? "").trim();
+      if (isValidGtfsDate(start) && isValidGtfsDate(end) && end < start) {
+        issues.push({
+          severity: "error",
+          code: "calendar_end_before_start",
+          message: `calendar.txt service_id="${sid}" の end_date が start_date より前です`,
+          entity: { type: "calendar", id: sid },
+        });
+      }
+
+      let allZero = true;
+      for (const day of CALENDAR_DAY_KEYS) {
+        const v = (row[day] ?? "").trim();
+        if (v !== "" && v !== "0" && v !== "1") {
+          issues.push({
+            severity: "error",
+            code: "invalid_calendar_day_flag",
+            message: `calendar.txt service_id="${sid}" の ${day} は 0 か 1 で指定してください: "${v}"`,
+            entity: { type: "calendar", id: sid, field: day },
+          });
+        }
+        if (v !== "0") allZero = false;
+      }
+      // 全曜日0かつ追加日もない service は、どの日にも運行しない空サービス（仕様 6.5）。
+      if (allZero && !additiveServices.has(sid)) {
+        issues.push({
+          severity: "error",
+          code: "service_empty",
+          message: `calendar.txt service_id="${sid}" は全曜日0かつ calendar_dates の追加日もありません（どの日も運行しません）`,
+          entity: { type: "calendar", id: sid },
+        });
       }
     }
   }
 
-  if (feed.tables.has("translations")) {
-    const hasKana = getRows(feed, "translations").some(
-      (row) => (row["language"] ?? "").trim() === "ja-Hrkt",
-    );
-    if (!hasKana) {
+  for (const row of getRows(feed, "calendar_dates")) {
+    const sid = (row["service_id"] ?? "").trim();
+    const date = (row["date"] ?? "").trim();
+    if (date !== "" && !isValidGtfsDate(date)) {
       issues.push({
         severity: "error",
-        code: "missing_japanese_kana_translation",
-        message: "GTFS-JP v4 では translations.txt に読み仮名（language=ja-Hrkt）の設定が必須です",
-        entity: { type: "translations", field: "language" },
+        code: "invalid_date_format",
+        message: `calendar_dates.txt service_id="${sid}" の date が YYYYMMDD ではありません: "${date}"`,
+        entity: { type: "calendar_dates", id: sid, field: "date" },
+      });
+    }
+    const et = (row["exception_type"] ?? "").trim();
+    if (et !== "" && et !== "1" && et !== "2") {
+      issues.push({
+        severity: "error",
+        code: "invalid_exception_type",
+        message: `calendar_dates.txt service_id="${sid}" の exception_type は 1（追加）か 2（削除）です: "${et}"`,
+        entity: { type: "calendar_dates", id: sid, field: "exception_type" },
       });
     }
   }
+}
 
+function checkGtfsJpV4(feed: Feed, issues: ValidationIssue[]) {
+  checkLegacyJpFiles(feed, issues);
+  checkGtfsJpTranslations(feed, issues);
+  checkGtfsJpFareAttributes(feed, issues);
+  checkFeedInfoDates(feed, issues);
+}
+
+const LEGACY_JP_FILES = ["agency_jp", "office_jp", "pattern_jp", "routes_jp"];
+
+function checkLegacyJpFiles(feed: Feed, issues: ValidationIssue[]) {
+  for (const name of LEGACY_JP_FILES) {
+    if (!feed.tables.has(name)) continue;
+    issues.push({
+      severity: "warning",
+      code: "legacy_jp_file",
+      message: `${name}.txt はGTFS-JP v4本体仕様ではなく、v3互換・参考扱いです`,
+      entity: { type: "file", id: name },
+    });
+  }
+}
+
+function checkGtfsJpTranslations(feed: Feed, issues: ValidationIssue[]) {
+  const translations = getRows(feed, "translations");
+  if (translations.length === 0) return;
+
+  const stopKanaIds = new Set<string>();
+  for (const row of translations) {
+    if (
+      (row["table_name"] ?? "").trim() === "stops" &&
+      (row["field_name"] ?? "").trim() === "stop_name" &&
+      (row["language"] ?? "").trim() === "ja-Hrkt"
+    ) {
+      const id = (row["record_id"] ?? "").trim();
+      if (id !== "") stopKanaIds.add(id);
+    }
+  }
+
+  const missing: string[] = [];
+  for (const row of getRows(feed, "stops")) {
+    const id = (row["stop_id"] ?? "").trim();
+    if (id !== "" && !stopKanaIds.has(id)) missing.push(id);
+  }
+  if (missing.length > 0) {
+    issues.push({
+      severity: "error",
+      code: "missing_stop_name_kana",
+      message: `translations.txt に停留所名の読み仮名（language=ja-Hrkt）がない停留所が ${missing.length} 件あります`,
+      entity: { type: "translations", count: missing.length, sample: missing.slice(0, 5) },
+    });
+  }
+}
+
+function checkGtfsJpFareAttributes(feed: Feed, issues: ValidationIssue[]) {
   for (const row of getRows(feed, "fare_attributes")) {
+    const id = (row["fare_id"] ?? "").trim();
     const price = Number((row["price"] ?? "").trim());
-    if (Number.isFinite(price) && price < 0) {
+    if (!Number.isFinite(price) || price < 0) {
       issues.push({
         severity: "error",
-        code: "negative_fare_price",
-        message: `fare_attributes.txt の price は0以上である必要があります: ${row["price"]}`,
-        entity: { type: "fare_attributes", id: row["fare_id"] ?? "", field: "price" },
+        code: "invalid_fare_price",
+        message: `fare_attributes.txt fare_id="${id}" の price が不正です`,
+        entity: { type: "fare_attributes", id, field: "price" },
+      });
+    }
+    const currency = (row["currency_type"] ?? "").trim();
+    if (currency !== "JPY") {
+      issues.push({
+        severity: "warning",
+        code: "non_jpy_fare_currency",
+        message: `fare_attributes.txt fare_id="${id}" の currency_type が JPY ではありません`,
+        entity: { type: "fare_attributes", id, field: "currency_type" },
+      });
+    }
+  }
+}
+
+function checkFeedInfoDates(feed: Feed, issues: ValidationIssue[]) {
+  for (const row of getRows(feed, "feed_info")) {
+    const start = (row["feed_start_date"] ?? "").trim();
+    const end = (row["feed_end_date"] ?? "").trim();
+    for (const [key, v] of [
+      ["feed_start_date", start],
+      ["feed_end_date", end],
+    ] as const) {
+      if (v !== "" && !isValidGtfsDate(v)) {
+        issues.push({
+          severity: "error",
+          code: "invalid_date_format",
+          message: `feed_info.txt の ${key} が YYYYMMDD ではありません: "${v}"`,
+          entity: { type: "feed_info", field: key },
+        });
+      }
+    }
+    if (isValidGtfsDate(start) && isValidGtfsDate(end) && end < start) {
+      issues.push({
+        severity: "error",
+        code: "feed_info_date_range",
+        message: "feed_info.txt の feed_end_date が feed_start_date より前です",
+        entity: { type: "feed_info" },
       });
     }
   }
@@ -477,8 +581,4 @@ function idSet(feed: Feed, table: string, key: string): Set<string> {
     if (v !== "") set.add(v);
   }
   return set;
-}
-
-function primaryKeyFor(table: string): string {
-  return PRIMARY_KEYS.find((pk) => pk.table === table)?.key ?? `${table}_id`;
 }
