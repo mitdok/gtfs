@@ -5,7 +5,7 @@
 
 - 最終更新: 2026-06-16
 - 対象コミット: 本ファイルと同一リビジョン
-- コア・テスト: 80 件 pass（`pnpm --filter @gtfs-studio/core test`）
+- コア・テスト: 85 件 pass（`pnpm --filter @gtfs-studio/core test`）
 
 ## 1. パイプライン全体
 
@@ -18,7 +18,8 @@
 | 出力（内部モデル → zip） | `exportGtfsZip` | ✅ 基本 | `src/exporter.ts` |
 | 出力プロファイル準拠フィルタ | `applyExportProfile` / `ExportOptions.profileId` | ✅ | `src/export-profile.ts`, `src/exporter.ts` |
 | 公開可否ゲート | `evaluateReleaseGate` ＋ Web表示 | ✅ 判定＋公開ゲートタブ | `src/release-gate.ts`, `web/components/ReleaseGateView.tsx` |
-| 検収（A-01〜A-10） | `evaluateAcceptance` | ✅ 11.5形式の判定器 | `src/acceptance.ts` |
+| 検収（A-01〜A-10） | `evaluateAcceptance` ＋ Web表示 | ✅ 11.5判定器＋公開ゲートに併載 | `src/acceptance.ts`, `web/components/ReleaseGateView.tsx` |
+| 検収パイプライン・CLI | `runAcceptancePipeline` / `gtfs-acceptance` | ✅ 11.4 検収コマンド | `src/pipeline.ts`, `bin/gtfs-acceptance.mjs` |
 | GTFS-RT ServiceAlerts | `encodeServiceAlertsFeed` | ✅ core builder | `src/realtime.ts` |
 
 ## 2. プロファイル（仕様 10.1）
@@ -70,7 +71,7 @@
 
 ### ⏳ 未実装（残タスク）
 
-仕様ロックの永続化・API層、標準validator実体（Java）の起動連携、検収レポートのWeb表示。
+仕様ロックの永続化・API層、validator実体のCI連携、GTFS-RT RT-2以降。
 
 ## 5. 仕様ロック・標準バリデータ連携・検収（仕様 10.2 / 10.7 / 10.9 / 10.10 / 11章）
 
@@ -82,18 +83,23 @@
 | 実データ検収 A-01〜A-10（11.1/11.5） | ✅ 判定器 | `src/acceptance.ts` |
 | プロファイル定義の外部データ化（10.11） | ✅ `src/profiles/*.json` 正本化 | `src/profile.ts`, `src/profile-schema.ts` |
 | 仕様ロックの保存・取得ストア（10.2） | ✅ インメモリ | `src/spec-lock.ts`（`createSpecLockStore`） |
+| 検収パイプライン（10.7順 / 11.4） | ✅ `runAcceptancePipeline` | `src/pipeline.ts` |
+| 検収CLI（11.4 検収コマンド） | ✅ `gtfs-acceptance`（report取込・Java起動・回帰証跡） | `bin/gtfs-acceptance.mjs` |
 | 仕様ロックの永続化（DB/ファイル）・API公開 | ⏳ 未実装（api層） | — |
-| validator実体（Java）の起動 | ⏳ 別レイヤ（CLI/API） | — |
 
-> validator の実行（Java実体の起動）はフレームワーク非依存のコアでは行わず、
-> 別レイヤが生成した `report.json` を `parseStandardValidatorReport` で取り込む。
+> validator の実行（Java実体）はコア本体では行わず、CLI（`gtfs-acceptance --validator-jar`）が
+> 起動するか、別途実行した `report.json` を `--report` で取り込む。判定は `runAcceptancePipeline` に集約。
 
 ## 6. 次の優先タスク（CHANGELOG「次の候補」と同期）
+
+GTFS-JP v4対応の詳細ロードマップと進捗率は
+[`GTFS_JP_V4_ROADMAP.md`](./GTFS_JP_V4_ROADMAP.md) に集約する。
 
 1. ~~標準バリデータ連携（10.7）と実データ検収（10.9 / 11章）~~ … ✅ 完了（`standard-validator.ts` / `acceptance.ts`）。
 2. ~~プロファイル定義の JSON 外部化（10.11）と仕様ロック保存（10.2）~~ … ✅ 完了（`src/profiles/*.json` / `createSpecLockStore`）。
 3. ~~公開ゲートのWeb表示~~ … ✅ 完了（`web/components/ReleaseGateView.tsx`、公開ゲートタブ）。
-4. （以降）仕様ロックの永続化・API層、validator実体の起動連携、検収レポートのWeb表示。
+4. ~~検収パイプライン・CLI（11.4）／検収レポートのWeb表示~~ … ✅ 完了（`pipeline.ts` / `bin/gtfs-acceptance.mjs` / 公開ゲートにA-01〜A-10併載）。
+5. （以降）仕様ロックの**永続化・API層**（DB/ファイル）、validator実体のCI連携、GTFS-RT RT-2以降。
 
 ## 7. GTFS-RT対応
 
@@ -103,7 +109,7 @@ GTFS-RTはフェーズ2以降の対象。ロードマップ、課題、達成管
 | フェーズ | 状態 | 内容 |
 |----------|------|------|
 | RT-0 | ✅ 着手 | 公式参照確認、ロードマップ・課題・達成管理表の整備 |
-| RT-1 | ⏳ core builder完了 | ServiceAlerts手動投入＋protobuf配信（`src/realtime.ts`） |
+| RT-1 | ⏳ core store＋Web pb出力完了 | ServiceAlerts手動投入＋protobuf配信（`src/realtime.ts`, `RealtimeAlertsView.tsx`） |
 | RT-2 | ⏳ 未着手 | 外部GTFS-RT中継・正規化 |
 | RT-3 | ⏳ 未着手 | VehiclePositions取込・配信 |
 | RT-4 | ⏳ 未着手 | TripUpdates生成・静的GTFS突合 |

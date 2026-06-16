@@ -3,6 +3,42 @@
 GTFS Studio（西沢ツールWEB版）の段階的実装の記録。仕様書（`docs/spec/`）に追従し、
 `packages/core` の取込・検証・移行・出力を一歩ずつ確実にしていく。
 
+## Unreleased — 検収パイプライン・CLI・検収チェックのWeb表示（10.7 / 11.4）
+
+取込→検証→標準validator結果取込→公開ゲート・検収（A-01〜A-10）までを 1 関数に
+まとめ、CLI と Web から同じ判定を再利用できるようにした（仕様 11.4 検収コマンド）。
+
+### 追加
+
+- **検収パイプライン**（`packages/core/src/pipeline.ts`、`runAcceptancePipeline`）。
+  zip バイト列または Feed を起点に、v4 / google 内部検証・`report.json` 取込・
+  `VALIDATOR_LOCK` 確定・`evaluateReleaseGate`・`evaluateAcceptance` を一括実行する。
+  fs / プロセス起動に非依存で、CLI/API/Web から共用できる。
+- **検収CLI**（`packages/core/bin/gtfs-acceptance.mjs`、bin `gtfs-acceptance`）。
+  `gtfs.zip` と `--report report.json`（または `--validator-jar` で MobilityData
+  validator を起動）から 11.5 形式の検収JSONを出力する。`--roundtrip-errors` /
+  `--v3-errors` / `--public-url-errors` で回帰証跡を渡せる。ready=0 / not_ready=2 で終了。
+- **検収チェックのWeb表示**。公開ゲートタブ（`ReleaseGateView.tsx`）に A-01〜A-10 の
+  チェックリストを併載。`report.json` 取込で `pipeline` 経由の判定に統一した。
+
+### テスト
+
+- `test/pipeline.test.ts`（3件）を追加。golden zip で ready/not_ready と例外を確認。
+  CLI は golden zip ＋ clean report で `ready`（10/10, exit 0）を実機確認。
+
+## Unreleased — GTFS-JP v4ロードマップ・進捗率管理
+
+GTFS-JP v4対応を段階的に進めるため、専用ロードマップと進捗率の算定表を追加した。
+
+### 追加
+
+- **`docs/GTFS_JP_V4_ROADMAP.md` を追加**。
+  仕様ロック、取込、移行、出力、検証、Google公開ゲート、標準validator、golden sample、
+  Web/API/公開URL運用を100点満点で管理する。
+- 現在の総合進捗を **68%** として記録。
+  coreライブラリ単体では約80%、公開運用プロダクトとしては約60〜70%という扱いに分けた。
+- STATUSからv4ロードマップへリンク。
+
 ## Unreleased — 公開ゲートのWeb表示（11.7 / 公開可否ブロッカー）
 
 `evaluateReleaseGate` の判定を Web UI から確認できるようにし、公開前に何が
@@ -34,10 +70,16 @@ GTFS-RT実装のRT-1として、ServiceAlertsのprotobuf生成をcoreに追加�
 - **ServiceAlertsの入力モデルを追加**。
   active_period、informed_entity（agency/route/stop/trip）、cause/effect/severity、
   多言語header/description/urlに対応。
+- **インメモリAlertストアを追加**。
+  複数Alertの保存、削除、有効期間フィルタ、保存済みAlertからの `alerts.pb` 生成に対応。
+- **Web UIにRT Alertタブを追加**。
+  手動Alertを入力し、protobuf生成結果をdecode previewで確認して `alerts.pb` として
+  ダウンロードできる。保存済みAlert一覧から複数Alertをまとめて出力できる。
+  protobuf依存はdynamic importで別チャンク化する。
 
 ### テスト
 
-- `test/realtime.test.ts`（4件）を追加。
+- `test/realtime.test.ts`（6件）を追加。
   protobuf encode後にdecodeし、header/entity/alertが期待通りであることを確認。
 
 ## Unreleased — プロファイル定義のJSON外部化・仕様ロックストア（10.11 / 10.2）

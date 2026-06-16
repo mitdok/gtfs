@@ -50,6 +50,22 @@ export interface ServiceAlertInput {
   url?: RealtimeText;
 }
 
+export interface StoredServiceAlert extends ServiceAlertInput {
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RealtimeAlertStore {
+  list(): StoredServiceAlert[];
+  listActive(at?: number | Date | string): StoredServiceAlert[];
+  get(id: string): StoredServiceAlert | undefined;
+  upsert(alert: ServiceAlertInput & { enabled?: boolean }, now?: number | Date | string): StoredServiceAlert;
+  remove(id: string): boolean;
+  clear(): void;
+  encode(options?: BuildServiceAlertsOptions & { activeAt?: number | Date | string }): Uint8Array;
+}
+
 export interface BuildServiceAlertsOptions {
   /** FeedHeader.timestamp。未指定時は実行時刻。 */
   timestamp?: number | Date | string;
@@ -97,6 +113,48 @@ export function realtimeFeedToObject(feed: transit_realtime.FeedMessage): Record
   }) as Record<string, unknown>;
 }
 
+export function createRealtimeAlertStore(initialAlerts: ServiceAlertInput[] = []): RealtimeAlertStore {
+  const alerts = new Map<string, StoredServiceAlert>();
+  const store: RealtimeAlertStore = {
+    list() {
+      return [...alerts.values()].map(cloneStoredAlert).sort((a, b) => a.id.localeCompare(b.id));
+    },
+    listActive(at = new Date()) {
+      const ts = toUnixSeconds(at, "activeAt");
+      return this.list().filter((alert) => alert.enabled && isAlertActive(alert, ts));
+    },
+    get(id: string) {
+      const alert = alerts.get(id);
+      return alert ? cloneStoredAlert(alert) : undefined;
+    },
+    upsert(alert, now = new Date()) {
+      // builder検証を通すことで、保存時点でprotobuf化できないAlertを拒否する。
+      buildServiceAlertsFeed([alert], { timestamp: now });
+      const timestamp = new Date(toUnixSeconds(now, "now") * 1000).toISOString();
+      const current = alerts.get(alert.id);
+      const stored: StoredServiceAlert = {
+        ...cloneAlertInput(alert),
+        enabled: alert.enabled ?? current?.enabled ?? true,
+        createdAt: current?.createdAt ?? timestamp,
+        updatedAt: timestamp,
+      };
+      alerts.set(stored.id, stored);
+      return cloneStoredAlert(stored);
+    },
+    remove(id: string) {
+      return alerts.delete(id);
+    },
+    clear() {
+      alerts.clear();
+    },
+    encode(options = {}) {
+      return encodeServiceAlertsFeed(this.listActive(options.activeAt ?? options.timestamp ?? new Date()), options);
+    },
+  };
+  for (const alert of initialAlerts) store.upsert(alert);
+  return store;
+}
+
 function buildAlertEntity(alert: ServiceAlertInput): transit_realtime.IFeedEntity {
   if (alert.id.trim() === "") throw new Error("ServiceAlertInput.id is required");
   if (alert.informedEntities.length === 0) {
@@ -125,6 +183,39 @@ function buildAlertEntity(alert: ServiceAlertInput): transit_realtime.IFeedEntit
       ...(alert.descriptionText ? { descriptionText: translatedString(alert.descriptionText, "descriptionText") } : {}),
       ...(alert.url ? { url: translatedString(alert.url, "url") } : {}),
     },
+  };
+}
+
+function isAlertActive(alert: ServiceAlertInput, ts: number): boolean {
+  const periods = alert.activePeriods ?? [];
+  if (periods.length === 0) return true;
+  return periods.some((period) => {
+    const start = period.start === undefined ? Number.NEGATIVE_INFINITY : toUnixSeconds(period.start, "activePeriod.start");
+    const end = period.end === undefined ? Number.POSITIVE_INFINITY : toUnixSeconds(period.end, "activePeriod.end");
+    return start <= ts && ts <= end;
+  });
+}
+
+function cloneStoredAlert(alert: StoredServiceAlert): StoredServiceAlert {
+  return {
+    ...cloneAlertInput(alert),
+    enabled: alert.enabled,
+    createdAt: alert.createdAt,
+    updatedAt: alert.updatedAt,
+  };
+}
+
+function cloneAlertInput(alert: ServiceAlertInput): ServiceAlertInput {
+  return {
+    id: alert.id,
+    activePeriods: alert.activePeriods?.map((period) => ({ ...period })),
+    informedEntities: alert.informedEntities.map((entity) => ({ ...entity })),
+    cause: alert.cause,
+    effect: alert.effect,
+    severityLevel: alert.severityLevel,
+    headerText: { ...alert.headerText },
+    descriptionText: alert.descriptionText ? { ...alert.descriptionText } : undefined,
+    url: alert.url ? { ...alert.url } : undefined,
   };
 }
 

@@ -7,11 +7,8 @@
  */
 import { useMemo, useState } from "react";
 import {
-  createSpecLockStore,
-  evaluateReleaseGate,
   parseStandardValidatorReport,
-  toStandardValidatorSummary,
-  validatorLockFromResult,
+  runAcceptancePipeline,
   type Feed,
   type StandardValidatorResult,
 } from "@gtfs-studio/core";
@@ -21,18 +18,26 @@ interface Props {
   profileId: string;
 }
 
+const CHECK_MARK: Record<string, string> = { pass: "✓", fail: "✗", skip: "—" };
+
 export function ReleaseGateView({ feed, profileId }: Props) {
   const [validator, setValidator] = useState<StandardValidatorResult | null>(null);
   const [loadError, setLoadError] = useState<string>("");
 
-  const report = useMemo(() => {
-    const store = createSpecLockStore();
-    if (validator) store.set(validatorLockFromResult(validator, { runMethod: "browser-upload" }));
-    return evaluateReleaseGate(feed, {
-      profileId,
-      specLocks: store.snapshot(),
-      standardValidator: validator ? toStandardValidatorSummary(validator) : undefined,
-    });
+  const { report, acceptance } = useMemo(() => {
+    // 取込済み validator 結果を MobilityDataReport 形へ戻して pipeline に渡す（件数を保持）。
+    const standardReport = validator
+      ? {
+          summary: { validatorVersion: validator.validatorVersion },
+          notices: validator.issues.map((i) => ({
+            code: i.code,
+            severity: i.severity,
+            totalNotices: i.count,
+          })),
+        }
+      : undefined;
+    const result = runAcceptancePipeline({ feed, profileId, standardReport });
+    return { report: result.gate, acceptance: result.acceptance };
   }, [feed, profileId, validator]);
 
   async function onReport(file: File) {
@@ -123,6 +128,32 @@ export function ReleaseGateView({ feed, profileId }: Props) {
             </tbody>
           </table>
         )}
+      </section>
+
+      <section className="gate-section">
+        <h3>検収チェック（A-01〜A-10 / 仕様 11.1）</h3>
+        <p className="hint">
+          A-07〜A-09（実フィード回帰・v3移行回帰・公開URL検証）はブラウザでは証跡が無いため
+          fail のままになります。CLI（`gtfs-acceptance`）で回帰結果を渡すと ready 判定できます。
+        </p>
+        <table className="issues acceptance-checks">
+          <thead>
+            <tr>
+              <th>判定</th>
+              <th>ID</th>
+              <th>内容</th>
+            </tr>
+          </thead>
+          <tbody>
+            {acceptance.checks.map((c) => (
+              <tr key={c.id} className={c.status === "pass" ? "" : "error"}>
+                <td className={`check-${c.status}`}>{CHECK_MARK[c.status] ?? c.status}</td>
+                <td className="mono">{c.id}</td>
+                <td>{c.detail}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </section>
     </div>
   );

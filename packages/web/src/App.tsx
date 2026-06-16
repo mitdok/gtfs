@@ -10,8 +10,9 @@ import { StopsView } from "./components/StopsView";
 import { TimetableView } from "./components/TimetableView";
 import { ValidationView } from "./components/ValidationView";
 import { ReleaseGateView } from "./components/ReleaseGateView";
+import { RealtimeAlertsView } from "./components/RealtimeAlertsView";
 
-type Tab = "stops" | "timetable" | "validation" | "release";
+type Tab = "stops" | "timetable" | "validation" | "release" | "rt-alerts";
 type ProfileId = "gtfs-jp-v4" | "google-transit-ready" | "gtfs-base" | "gtfs-jp-v3-legacy";
 
 const PROFILE_OPTIONS: { id: ProfileId; label: string }[] = [
@@ -143,7 +144,25 @@ export function App() {
         </div>
       )}
 
-      {!feed ? (
+      <nav className="tabs">
+        <button className={tab === "stops" ? "active" : ""} onClick={() => setTab("stops")}>
+          停留所
+        </button>
+        <button className={tab === "timetable" ? "active" : ""} onClick={() => setTab("timetable")}>
+          ダイヤ
+        </button>
+        <button className={tab === "validation" ? "active" : ""} onClick={() => setTab("validation")}>
+          検証 {summary ? `(${summary.errors + summary.warnings})` : ""}
+        </button>
+        <button className={tab === "release" ? "active" : ""} onClick={() => setTab("release")}>
+          公開ゲート
+        </button>
+        <button className={tab === "rt-alerts" ? "active" : ""} onClick={() => setTab("rt-alerts")}>
+          RT Alert
+        </button>
+      </nav>
+
+      {!feed && tab !== "rt-alerts" ? (
         <div className="empty">
           <p>GTFS（GTFS-JP）の zip ファイルを開いてください。</p>
           <p className="hint">
@@ -151,39 +170,25 @@ export function App() {
           </p>
         </div>
       ) : (
-        <>
-          <nav className="tabs">
-            <button className={tab === "stops" ? "active" : ""} onClick={() => setTab("stops")}>
-              停留所
-            </button>
-            <button
-              className={tab === "timetable" ? "active" : ""}
-              onClick={() => setTab("timetable")}
-            >
-              ダイヤ
-            </button>
-            <button
-              className={tab === "validation" ? "active" : ""}
-              onClick={() => setTab("validation")}
-            >
-              検証 {summary ? `(${summary.errors + summary.warnings})` : ""}
-            </button>
-            <button
-              className={tab === "release" ? "active" : ""}
-              onClick={() => setTab("release")}
-            >
-              公開ゲート
-            </button>
-          </nav>
-          <main className="main">
-            {tab === "stops" && <StopsView feed={feed} version={version} mutateFeed={mutateFeed} />}
-            {tab === "timetable" && (
+        <main className="main">
+          {tab === "stops" && feed && (
+            <StopsView feed={feed} version={version} mutateFeed={mutateFeed} />
+          )}
+          {tab === "timetable" &&
+            (feed ? (
               <TimetableView feed={feed} version={version} mutateFeed={mutateFeed} />
-            )}
-            {tab === "validation" && <ValidationView report={report} profileId={profileId} />}
-            {tab === "release" && <ReleaseGateView feed={feed} profileId={profileId} />}
-          </main>
-        </>
+            ) : (
+              <div className="empty">GTFS zip を開いてください。</div>
+            ))}
+          {tab === "validation" && <ValidationView report={report} profileId={profileId} />}
+          {tab === "release" &&
+            (feed ? (
+              <ReleaseGateView feed={feed} profileId={profileId} />
+            ) : (
+              <div className="empty">GTFS zip を開いてください。</div>
+            ))}
+          {tab === "rt-alerts" && <RealtimeAlertsView />}
+        </main>
       )}
     </div>
   );

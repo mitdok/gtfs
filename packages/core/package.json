@@ -16,9 +16,13 @@
       "import": "./dist/realtime.js"
     }
   },
+  "bin": {
+    "gtfs-acceptance": "./bin/gtfs-acceptance.mjs"
+  },
   "files": [
     "dist",
-    "src"
+    "src",
+    "bin"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json && node ./scripts/copy-profiles.mjs",

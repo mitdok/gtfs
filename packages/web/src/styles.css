@@ -104,6 +104,35 @@ tr.error td:first-child { color: #d7263d; font-weight: 600; }
 tr.warning td:first-child { color: #b07d10; font-weight: 600; }
 .all-clear { color: #2ea043; }
 
+/* GTFS-RT Alert */
+.rt-alerts-view {
+  flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(480px, 0.95fr) 1.05fr;
+  gap: 16px; padding: 16px; background: #fff; overflow: auto;
+}
+.rt-alert-form, .rt-preview, .rt-alert-list { min-width: 0; }
+.rt-alert-list { grid-column: 1 / -1; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.form-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #57606a; }
+.form-grid label.wide { grid-column: 1 / -1; }
+.form-grid input, .form-grid select, .form-grid textarea {
+  width: 100%; border: 1px solid #d0d7de; border-radius: 6px; padding: 6px 8px;
+  font: inherit; color: #222; background: #fff;
+}
+.form-grid textarea { min-height: 72px; resize: vertical; }
+.rt-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.rt-error { margin-top: 10px; padding: 8px 10px; border-radius: 6px; background: #ffe5e9; color: #9f1025; }
+.rt-preview h3 { margin: 0 0 8px; font-size: 14px; }
+.rt-alert-list h3 { margin: 0 0 8px; font-size: 14px; }
+.rt-preview pre {
+  margin: 0; max-height: calc(100vh - 210px); overflow: auto; padding: 12px;
+  border: 1px solid #d0d7de; border-radius: 6px; background: #f6f8fa;
+  font-family: ui-monospace, monospace; font-size: 12px; line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .rt-alerts-view { grid-template-columns: 1fr; }
+}
+
 /* 公開ゲートビュー */
 .release-gate-view { flex: 1; overflow: auto; padding: 16px; background: #fff; }
 .release-gate-view .summary { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
@@ -118,3 +147,7 @@ tr.warning td:first-child { color: #b07d10; font-weight: 600; }
 }
 .lock-list .lock.locked { background: #eaf6ec; border-color: #b6e0bf; }
 .lock-list .lock.missing { background: #fbeaec; border-color: #f0c0c6; color: #d7263d; }
+.acceptance-checks td:first-child { text-align: center; font-weight: 700; width: 36px; }
+.check-pass { color: #2ea043; }
+.check-fail { color: #d7263d; }
+.check-skip { color: #999; }

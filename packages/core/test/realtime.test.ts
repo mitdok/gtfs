@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildServiceAlertsFeed,
+  createRealtimeAlertStore,
   decodeRealtimeFeed,
   encodeServiceAlertsFeed,
   realtimeFeedToObject,
@@ -89,5 +90,51 @@ describe("GTFS-RT ServiceAlerts", () => {
         },
       ]),
     ).toThrow(/informed entity/);
+  });
+
+  it("Alertストアで複数Alertを保持し、有効期間内のものだけFeed化できる", () => {
+    const store = createRealtimeAlertStore();
+    store.upsert(
+      {
+        id: "active-alert",
+        activePeriods: [{ start: "2026-06-16T09:00:00+09:00", end: "2026-06-16T18:00:00+09:00" }],
+        informedEntities: [{ routeId: "R1" }],
+        effect: "DETOUR",
+        headerText: { ja: "迂回運行" },
+      },
+      "2026-06-16T00:00:00Z",
+    );
+    store.upsert(
+      {
+        id: "expired-alert",
+        activePeriods: [{ start: "2026-06-15T09:00:00+09:00", end: "2026-06-15T18:00:00+09:00" }],
+        informedEntities: [{ routeId: "R2" }],
+        effect: "NO_SERVICE",
+        headerText: { ja: "運休" },
+      },
+      "2026-06-16T00:00:00Z",
+    );
+
+    expect(store.list()).toHaveLength(2);
+    expect(store.listActive("2026-06-16T10:00:00+09:00").map((a) => a.id)).toEqual(["active-alert"]);
+    const feed = decodeRealtimeFeed(
+      store.encode({
+        timestamp: "2026-06-16T10:00:00+09:00",
+        activeAt: "2026-06-16T10:00:00+09:00",
+      }),
+    );
+    expect(feed.entity.map((entity) => entity.id)).toEqual(["active-alert"]);
+  });
+
+  it("Alertストアは保存時に不正Alertを拒否する", () => {
+    const store = createRealtimeAlertStore();
+    expect(() =>
+      store.upsert({
+        id: "invalid",
+        informedEntities: [],
+        headerText: { ja: "不正" },
+      }),
+    ).toThrow(/informed entity/);
+    expect(store.list()).toHaveLength(0);
   });
 });
