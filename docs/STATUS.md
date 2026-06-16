@@ -5,7 +5,7 @@
 
 - 最終更新: 2026-06-16
 - 対象コミット: 本ファイルと同一リビジョン
-- コア・テスト: 76 件 pass（`pnpm --filter @gtfs-studio/core test`）
+- コア・テスト: 80 件 pass（`pnpm --filter @gtfs-studio/core test`）
 
 ## 1. パイプライン全体
 
@@ -17,7 +17,9 @@
 | 検証 | `validateFeed` | ✅ 層1＋層2一部 | `src/validator.ts`, `src/profile.ts` |
 | 出力（内部モデル → zip） | `exportGtfsZip` | ✅ 基本 | `src/exporter.ts` |
 | 出力プロファイル準拠フィルタ | `applyExportProfile` / `ExportOptions.profileId` | ✅ | `src/export-profile.ts`, `src/exporter.ts` |
-| 公開可否ゲート | `evaluateReleaseGate` | ✅ 標準validator結果の受け口まで | `src/release-gate.ts`, `src/spec-lock.ts` |
+| 公開可否ゲート | `evaluateReleaseGate` ＋ Web表示 | ✅ 判定＋公開ゲートタブ | `src/release-gate.ts`, `web/components/ReleaseGateView.tsx` |
+| 検収（A-01〜A-10） | `evaluateAcceptance` | ✅ 11.5形式の判定器 | `src/acceptance.ts` |
+| GTFS-RT ServiceAlerts | `encodeServiceAlertsFeed` | ✅ core builder | `src/realtime.ts` |
 
 ## 2. プロファイル（仕様 10.1）
 
@@ -68,7 +70,7 @@
 
 ### ⏳ 未実装（残タスク）
 
-仕様ロック保存API、プロファイル定義のJSON外部化、公開ゲートのWeb表示。
+仕様ロックの永続化・API層、標準validator実体（Java）の起動連携、検収レポートのWeb表示。
 
 ## 5. 仕様ロック・標準バリデータ連携・検収（仕様 10.2 / 10.7 / 10.9 / 10.10 / 11章）
 
@@ -90,8 +92,8 @@
 
 1. ~~標準バリデータ連携（10.7）と実データ検収（10.9 / 11章）~~ … ✅ 完了（`standard-validator.ts` / `acceptance.ts`）。
 2. ~~プロファイル定義の JSON 外部化（10.11）と仕様ロック保存（10.2）~~ … ✅ 完了（`src/profiles/*.json` / `createSpecLockStore`）。
-3. **公開ゲートのWeb表示**：`evaluateReleaseGate` / `evaluateAcceptance` の blocker をUIで確認できるようにする。
-4. （以降）仕様ロックの永続化・API層、validator実体の起動連携。
+3. ~~公開ゲートのWeb表示~~ … ✅ 完了（`web/components/ReleaseGateView.tsx`、公開ゲートタブ）。
+4. （以降）仕様ロックの永続化・API層、validator実体の起動連携、検収レポートのWeb表示。
 
 ## 7. GTFS-RT対応
 
@@ -101,7 +103,7 @@ GTFS-RTはフェーズ2以降の対象。ロードマップ、課題、達成管
 | フェーズ | 状態 | 内容 |
 |----------|------|------|
 | RT-0 | ✅ 着手 | 公式参照確認、ロードマップ・課題・達成管理表の整備 |
-| RT-1 | ⏳ 未着手 | ServiceAlerts手動投入＋protobuf配信 |
+| RT-1 | ⏳ core builder完了 | ServiceAlerts手動投入＋protobuf配信（`src/realtime.ts`） |
 | RT-2 | ⏳ 未着手 | 外部GTFS-RT中継・正規化 |
 | RT-3 | ⏳ 未着手 | VehiclePositions取込・配信 |
 | RT-4 | ⏳ 未着手 | TripUpdates生成・静的GTFS突合 |

@@ -3,6 +3,43 @@
 GTFS Studio（西沢ツールWEB版）の段階的実装の記録。仕様書（`docs/spec/`）に追従し、
 `packages/core` の取込・検証・移行・出力を一歩ずつ確実にしていく。
 
+## Unreleased — 公開ゲートのWeb表示（11.7 / 公開可否ブロッカー）
+
+`evaluateReleaseGate` の判定を Web UI から確認できるようにし、公開前に何が
+ブロッカーかを画面で把握できるようにした。
+
+### 追加
+
+- **公開ゲートタブ**（`packages/web/src/components/ReleaseGateView.tsx`）。
+  選択中プロファイルで `evaluateReleaseGate` を実行し、`ready` / `not_ready`、
+  公開ブロッカー一覧（コード＋説明）、必須仕様ロックのロック済/未設定を表示する。
+- **標準validatorレポートのブラウザ取込**。MobilityData の `report.json` を読み込むと
+  `parseStandardValidatorReport` で集計し、`validatorLockFromResult` で `VALIDATOR_LOCK`
+  を確定、`validator_not_executed` ブロッカーを解消する（validator実体の起動は別レイヤ）。
+- `App.tsx` に「公開ゲート」タブを追加。
+
+## Unreleased — GTFS-RT ServiceAlerts core builder
+
+GTFS-RT実装のRT-1として、ServiceAlertsのprotobuf生成をcoreに追加した。
+
+### 追加
+
+- **`gtfs-realtime-bindings` を追加**。
+  公式GTFS Realtime proto由来のFeedMessageクラスでencode/decodeする。
+- **`packages/core/src/realtime.ts` を追加**。
+  `ServiceAlertInput` からGTFS-RT `FeedMessage` を作り、`Uint8Array` の `.pb` と
+  デバッグ用objectへ変換できる。
+- **RT APIを `@gtfs-studio/core/realtime` サブパスとして公開**。
+  通常のWeb画面で `@gtfs-studio/core` をimportしてもprotobuf依存を巻き込まない。
+- **ServiceAlertsの入力モデルを追加**。
+  active_period、informed_entity（agency/route/stop/trip）、cause/effect/severity、
+  多言語header/description/urlに対応。
+
+### テスト
+
+- `test/realtime.test.ts`（4件）を追加。
+  protobuf encode後にdecodeし、header/entity/alertが期待通りであることを確認。
+
 ## Unreleased — プロファイル定義のJSON外部化・仕様ロックストア（10.11 / 10.2）
 
 検証/出力プロファイルを TypeScript 定数から **JSON 定義（`src/profiles/*.json`）を

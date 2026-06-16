@@ -9,8 +9,9 @@ import {
 import { StopsView } from "./components/StopsView";
 import { TimetableView } from "./components/TimetableView";
 import { ValidationView } from "./components/ValidationView";
+import { ReleaseGateView } from "./components/ReleaseGateView";
 
-type Tab = "stops" | "timetable" | "validation";
+type Tab = "stops" | "timetable" | "validation" | "release";
 type ProfileId = "gtfs-jp-v4" | "google-transit-ready" | "gtfs-base" | "gtfs-jp-v3-legacy";
 
 const PROFILE_OPTIONS: { id: ProfileId; label: string }[] = [
@@ -167,6 +168,12 @@ export function App() {
             >
               検証 {summary ? `(${summary.errors + summary.warnings})` : ""}
             </button>
+            <button
+              className={tab === "release" ? "active" : ""}
+              onClick={() => setTab("release")}
+            >
+              公開ゲート
+            </button>
           </nav>
           <main className="main">
             {tab === "stops" && <StopsView feed={feed} version={version} mutateFeed={mutateFeed} />}
@@ -174,6 +181,7 @@ export function App() {
               <TimetableView feed={feed} version={version} mutateFeed={mutateFeed} />
             )}
             {tab === "validation" && <ValidationView report={report} profileId={profileId} />}
+            {tab === "release" && <ReleaseGateView feed={feed} profileId={profileId} />}
           </main>
         </>
       )}

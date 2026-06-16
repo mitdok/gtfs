@@ -27,7 +27,7 @@
 | フェーズ | 目的 | 成果物 | 状態 |
 |----------|------|--------|------|
 | RT-0 | 調査・設計固定 | 本ロードマップ、仕様07章更新、受入基準 | ✅ 着手 |
-| RT-1 | ServiceAlerts最小実装 | 手動Alert入力モデル、protobuf生成、HTTP配信 | ⏳ 未着手 |
+| RT-1 | ServiceAlerts最小実装 | 手動Alert入力モデル、protobuf生成、HTTP配信 | ⏳ core builder完了 |
 | RT-2 | 外部GTFS-RT中継 | 既存 `.pb` の取得、検証、キャッシュ、再配信 | ⏳ 未着手 |
 | RT-3 | VehiclePositions取込 | GPS/外部JSON入力、車両位置Feed生成 | ⏳ 未着手 |
 | RT-4 | TripUpdates生成 | 静的GTFSとの突合、遅延算出、StopTimeUpdate生成 | ⏳ 未着手 |
@@ -39,11 +39,11 @@
 
 | ID | タスク | 受入基準 | 状態 |
 |----|--------|----------|------|
-| RT-1-1 | protobuf依存選定 | JS/TSでFeedMessageをencode/decodeできる | ⏳ |
-| RT-1-2 | `@gtfs-studio/core` にGTFS-RT型・builder追加 | Alert 1件から `FeedMessage` を生成できる | ⏳ |
-| RT-1-3 | Alert入力モデル定義 | route/stop/trip向け informed_entity、期間、cause/effect、多言語文言を保持 | ⏳ |
-| RT-1-4 | `alerts.pb` 生成テスト | protobuf decode後にheader/entity/alertが期待通り | ⏳ |
-| RT-1-5 | API設計更新 | `POST /projects/{p}/rt/alerts` と `GET /rt/.../alerts.pb` を仕様化 | ⏳ |
+| RT-1-1 | protobuf依存選定 | JS/TSでFeedMessageをencode/decodeできる | ✅ |
+| RT-1-2 | `@gtfs-studio/core` にGTFS-RT型・builder追加 | Alert 1件から `FeedMessage` を生成できる | ✅ |
+| RT-1-3 | Alert入力モデル定義 | route/stop/trip向け informed_entity、期間、cause/effect、多言語文言を保持 | ✅ |
+| RT-1-4 | `alerts.pb` 生成テスト | protobuf decode後にheader/entity/alertが期待通り | ✅ |
+| RT-1-5 | API設計更新 | `POST /projects/{p}/rt/alerts` と `GET /rt/.../alerts.pb` を仕様化 | ✅ |
 | RT-1-6 | Web入力画面の最小版 | 運休・遅延・停留所閉鎖Alertを手動登録できる | ⏳ |
 
 ### RT-2 外部GTFS-RT中継
@@ -111,8 +111,7 @@
 
 ## 6. 次に実装する順番
 
-1. protobuf依存を選定し、`FeedMessage` のencode/decodeテストを作る。
-2. ServiceAlertsのbuilderをcoreへ追加する。
-3. `alerts.pb` のHTTP配信API設計を `docs/spec/05-api.md` に追加する。
+1. ~~protobuf依存を選定し、`FeedMessage` のencode/decodeテストを作る。~~ ✅
+2. ~~ServiceAlertsのbuilderをcoreへ追加する。~~ ✅
+3. Web/API側で手動Alert CRUDと `alerts.pb` 配信を実装する。
 4. 外部GTFS-RT中継のsourceモデルとpoller設計へ進む。
-

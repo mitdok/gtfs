@@ -103,3 +103,18 @@ table.issues td, table.issues th { white-space: normal; }
 tr.error td:first-child { color: #d7263d; font-weight: 600; }
 tr.warning td:first-child { color: #b07d10; font-weight: 600; }
 .all-clear { color: #2ea043; }
+
+/* 公開ゲートビュー */
+.release-gate-view { flex: 1; overflow: auto; padding: 16px; background: #fff; }
+.release-gate-view .summary { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.gate-section { margin: 16px 0; }
+.gate-section h3 { font-size: 13px; margin: 0 0 8px; color: #24292f; }
+.gate-section .hint { font-size: 12px; color: #888; margin-left: 8px; }
+.validator-info { font-size: 12px; color: #57606a; margin-left: 8px; }
+.lock-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; max-width: 480px; }
+.lock-list .lock {
+  display: flex; justify-content: space-between; padding: 6px 10px;
+  border: 1px solid #d0d7de; border-radius: 6px; font-size: 12px;
+}
+.lock-list .lock.locked { background: #eaf6ec; border-color: #b6e0bf; }
+.lock-list .lock.missing { background: #fbeaec; border-color: #f0c0c6; color: #d7263d; }
