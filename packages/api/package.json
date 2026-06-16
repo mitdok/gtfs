@@ -1,0 +1,27 @@
+{
+  "name": "@gtfs-studio/api",
+  "version": "0.0.0",
+  "description": "GTFS Studio backend API: spec-lock persistence + acceptance over HTTP (zero-dependency).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "gtfs-api": "./bin/gtfs-api.mjs"
+  },
+  "files": ["dist", "src", "bin"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node ./bin/gtfs-api.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@gtfs-studio/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}

@@ -3,6 +3,32 @@
 GTFS Studio（西沢ツールWEB版）の段階的実装の記録。仕様書（`docs/spec/`）に追従し、
 `packages/core` の取込・検証・移行・出力を一歩ずつ確実にしていく。
 
+## Unreleased — バックエンドAPI: 仕様ロック永続化・検収HTTP（10.2 / 11.4）
+
+仕様ロックの永続化と検収実行を HTTP で提供する `@gtfs-studio/api` を新設した。
+仕様 10.2「ロック状態はAPIで取得できるように」と 11.4 検収コマンドのサーバ実体。
+外部依存ゼロ（`node:http` / `node:fs`）で、自治体オンプレ運用でも追加ランタイムを要しない。
+
+### 追加
+
+- **`packages/api` を新設**（`@gtfs-studio/api`）。`@gtfs-studio/core` のみに依存。
+- **仕様ロックのファイル永続化**（`api/src/spec-lock-repository.ts`、
+  `openSpecLockRepository`）。core の `createSpecLockStore` をエンジンに、JSON ファイルへ
+  保存・復元する。core 本体は fs 非依存のまま、永続化責務を api 層へ分離。
+- **HTTP API**（`api/src/server.ts`、`createApiServer`）。
+  - `GET /health`
+  - `GET /spec-locks` ／ `GET /spec-locks/:id` ／ `PUT /spec-locks/:id`（永続化）
+  - `POST /acceptance`（zip(base64) ＋ 任意の validator report ＋ 回帰証跡 →
+    `runAcceptancePipeline` → 11.5 形式の検収結果＋公開ゲート＋検証サマリを返す）
+- **起動エントリ**（`api/bin/gtfs-api.mjs`、bin `gtfs-api`）。`--port` / `--locks` と
+  環境変数 `PORT` / `GTFS_SPEC_LOCKS_PATH` に対応。
+
+### テスト
+
+- `api/test/spec-lock-repository.test.ts`（3件）、`api/test/server.test.ts`（7件）を追加。
+  ロックの永続化往復、各エンドポイント、`POST /acceptance` の ready/not_ready/400 を確認。
+  ライブサーバの health / ロック保存・永続化も実機確認。API 全 10 件 pass。
+
 ## Unreleased — 検収パイプライン・CLI・検収チェックのWeb表示（10.7 / 11.4）
 
 取込→検証→標準validator結果取込→公開ゲート・検収（A-01〜A-10）までを 1 関数に
@@ -26,6 +52,29 @@ GTFS Studio（西沢ツールWEB版）の段階的実装の記録。仕様書（
 - `test/pipeline.test.ts`（3件）を追加。golden zip で ready/not_ready と例外を確認。
   CLI は golden zip ＋ clean report で `ready`（10/10, exit 0）を実機確認。
 
+## Unreleased — 新規GTFS-JP v4作成画面
+
+既存GTFS zipの取込だけでなく、ゼロから最小GTFS-JP v4フィードを作れるようにした。
+
+### 追加
+
+- **`createGtfsJpV4StarterFeed` を追加**（`packages/core/src/starter-feed.ts`）。
+  agency/route/stops/service から、`agency`, `stops`, `routes`, `trips`, `stop_times`,
+  `calendar`, `feed_info`, `fare_attributes`, `translations` を生成する。
+- **Web UIに「新規作成」画面を追加**。
+  事業者、路線、期間、停留所を入力して最小v4フィードを作り、既存の停留所編集・
+  ダイヤ編集・検証・出力へそのまま遷移できる。
+- **新規作成後の編集操作を追加**。
+  ダイヤ画面から路線を追加できる。停留所一覧から停留所を追加し、停留所名・かな・
+  座標を編集できる。ダイヤ画面では既存パターンまたは停留所順を使って新しい便と
+  `stop_times` を追加できる。
+- v4ロードマップの総合進捗を **70%** に更新。
+
+### テスト
+
+- `test/starter-feed.test.ts`（2件）を追加。生成直後のフィードが
+  `gtfs-jp-v4` profile error 0 であることを確認。
+
 ## Unreleased — GTFS-JP v4ロードマップ・進捗率管理
 
 GTFS-JP v4対応を段階的に進めるため、専用ロードマップと進捗率の算定表を追加した。
@@ -35,7 +84,7 @@ GTFS-JP v4対応を段階的に進めるため、専用ロードマップと進�
 - **`docs/GTFS_JP_V4_ROADMAP.md` を追加**。
   仕様ロック、取込、移行、出力、検証、Google公開ゲート、標準validator、golden sample、
   Web/API/公開URL運用を100点満点で管理する。
-- 現在の総合進捗を **68%** として記録。
+- 現在の総合進捗を **70%** として記録。
   coreライブラリ単体では約80%、公開運用プロダクトとしては約60〜70%という扱いに分けた。
 - STATUSからv4ロードマップへリンク。
 

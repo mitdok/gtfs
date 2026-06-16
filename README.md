@@ -17,9 +17,9 @@ docs/
   STATUS.md       仕様 ⇄ 実装の対応表（実装進捗）
 CHANGELOG.md      変更履歴
 packages/
-  core/           GTFS エンジン（取込・検証・移行・出力。フレームワーク非依存・純TS）
-  web/            Web UI（React + MapLibre。取込・停留所地図編集・ダイヤ表・検証）
-  （今後）api/     バックエンドAPI（Node/TS + Postgres。永続化・版管理）
+  core/           GTFS エンジン（取込・検証・移行・出力・検収。フレームワーク非依存・純TS）
+  web/            Web UI（React + MapLibre。取込・停留所地図編集・ダイヤ表・検証・公開ゲート）
+  api/            バックエンドAPI（node:http・依存ゼロ。仕様ロック永続化・検収HTTP）
 gtfs-tmp/         作業用スクラッチ・過去スナップショット（Git管理外）
 ```
 
