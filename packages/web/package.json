@@ -1,0 +1,26 @@
+{
+  "name": "@gtfs-studio/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "GTFS Studio Web UI: 取込・閲覧・編集・検証デモ",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@gtfs-studio/core": "workspace:*",
+    "maplibre-gl": "^4.7.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.0",
+    "vite": "^5.4.11"
+  }
+}

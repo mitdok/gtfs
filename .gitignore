@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.tools/
+*.log
+.DS_Store
+coverage/
+.env
+.env.local
+
+gtfs-tmp/

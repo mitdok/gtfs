@@ -1,0 +1,12 @@
+{
+  "name": "gtfs-studio",
+  "version": "0.0.0",
+  "private": true,
+  "description": "GTFS-JP/RT 公開データ生成・配信WEBサービス（西沢ツールWEB版）",
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test"
+  },
+  "packageManager": "pnpm@10.33.0"
+}
