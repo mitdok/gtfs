@@ -1,10 +1,32 @@
 /**
- * 出力/検証プロファイル。
+ * 出力/検証プロファイル（実行時表現）。
  *
- * 仕様書の「項目定義は設定（バージョン定義）駆動」に従い、ファイル/項目の要否を
- * データとして持つ。MVP では国際標準GTFSの中核（gtfs-base）と、国土交通省
- * GTFS-JP 第4.0版PDFに基づく固定路線バス向けの gtfs-jp-v4 中核要件を実装する。
+ * 仕様 10.11 の「ルール定義データ」を正本とし、`src/profiles/*.json` を読み込んで
+ * 実行時の最小 `Profile` を導出する。検証ロジック（validator.ts）はこの最小表現
+ * （ファイル/項目の要否）だけを参照し、版・根拠仕様などのメタデータは定義層
+ * （`ProfileDefinition`、`getProfileDefinition`）に保持する。仕様改定時は JSON 差し替え。
  */
+import type {
+  DefinitionPresence,
+  FieldDefinition,
+  FileDefinition,
+  ProfileDefinition,
+} from "./profile-schema.js";
+import type { SpecLockId } from "./spec-lock.js";
+import type { Severity } from "./validator.js";
+
+import gtfsBaseRaw from "./profiles/gtfs-base.json" with { type: "json" };
+import gtfsJpV4Raw from "./profiles/gtfs-jp-v4.json" with { type: "json" };
+import gtfsJpV3LegacyRaw from "./profiles/gtfs-jp-v3-legacy.json" with { type: "json" };
+import googleTransitReadyRaw from "./profiles/google-transit-ready.json" with { type: "json" };
+
+export type {
+  ProfileDefinition,
+  FileDefinition,
+  FieldDefinition,
+  ExtraRule,
+  DefinitionPresence,
+} from "./profile-schema.js";
 
 export type FieldPresence = "required" | "recommended" | "optional" | "conditionallyRequired";
 
@@ -34,253 +56,162 @@ export interface Profile {
   serviceFilesEitherRequired: boolean;
 }
 
-/** 国際標準GTFSの中核プロファイル（MVP）。 */
-export const GTFS_BASE: Profile = {
-  id: "gtfs-base",
-  label: "GTFS (base)",
-  serviceFilesEitherRequired: true,
-  files: [
-    {
-      name: "agency",
-      required: true,
-      fields: [
-        { name: "agency_name", required: true },
-        { name: "agency_url", required: true },
-        { name: "agency_timezone", required: true },
-      ],
-    },
-    {
-      name: "stops",
-      required: true,
-      fields: [
-        { name: "stop_id", required: true },
-        { name: "stop_name", required: true },
-        { name: "stop_lat", required: true },
-        { name: "stop_lon", required: true },
-      ],
-    },
-    {
-      name: "routes",
-      required: true,
-      fields: [
-        { name: "route_id", required: true },
-        { name: "route_type", required: true },
-      ],
-    },
-    {
-      name: "trips",
-      required: true,
-      fields: [
-        { name: "route_id", required: true },
-        { name: "service_id", required: true },
-        { name: "trip_id", required: true },
-      ],
-    },
-    {
-      name: "stop_times",
-      required: true,
-      fields: [
-        { name: "trip_id", required: true },
-        { name: "stop_id", required: true },
-        { name: "stop_sequence", required: true },
-      ],
-    },
-    {
-      name: "calendar",
-      fields: [
-        { name: "service_id", required: true },
-        { name: "monday", required: true },
-        { name: "tuesday", required: true },
-        { name: "wednesday", required: true },
-        { name: "thursday", required: true },
-        { name: "friday", required: true },
-        { name: "saturday", required: true },
-        { name: "sunday", required: true },
-        { name: "start_date", required: true },
-        { name: "end_date", required: true },
-      ],
-    },
-    {
-      name: "calendar_dates",
-      fields: [
-        { name: "service_id", required: true },
-        { name: "date", required: true },
-        { name: "exception_type", required: true },
-      ],
-    },
-    { name: "feed_info", fields: [] },
-  ],
-};
+// --- JSON（snake_case）→ ProfileDefinition（camelCase）正規化 ------------------
 
-/** GTFS-JP 第4.0版PDFに基づく、固定路線バスMVP向けプロファイル。 */
-export const GTFS_JP_V4: Profile = {
-  id: "gtfs-jp-v4",
-  label: "GTFS-JP v4",
-  serviceFilesEitherRequired: true,
-  files: [
-    {
-      name: "feed_info",
-      required: true,
-      fields: [
-        { name: "feed_publisher_name", required: true },
-        { name: "feed_publisher_url", required: true },
-        { name: "feed_lang", required: true },
-        { name: "feed_start_date", required: true },
-        { name: "feed_end_date", required: true },
-        { name: "feed_version", required: true },
-      ],
-    },
-    {
-      name: "agency",
-      required: true,
-      fields: [
-        { name: "agency_id", required: true },
-        { name: "agency_name", required: true },
-        { name: "agency_url", required: true },
-        { name: "agency_timezone", required: true },
-        { name: "agency_lang", required: true },
-      ],
-    },
-    {
-      name: "stops",
-      required: true,
-      fields: [
-        { name: "stop_id", required: true },
-        { name: "stop_name", required: true },
-        { name: "stop_lat", required: true },
-        { name: "stop_lon", required: true },
-        { name: "location_type", required: true },
-      ],
-    },
-    {
-      name: "routes",
-      required: true,
-      fields: [
-        { name: "route_id", required: true },
-        { name: "agency_id", required: true },
-        { name: "route_type", required: true },
-      ],
-    },
-    {
-      name: "trips",
-      required: true,
-      fields: [
-        { name: "route_id", required: true },
-        { name: "service_id", required: true },
-        { name: "trip_id", required: true },
-      ],
-    },
-    {
-      name: "stop_times",
-      required: true,
-      fields: [
-        { name: "trip_id", required: true },
-        { name: "stop_id", required: true },
-        { name: "stop_sequence", required: true },
-      ],
-    },
-    {
-      name: "calendar",
-      fields: [
-        { name: "service_id", required: true },
-        { name: "monday", required: true },
-        { name: "tuesday", required: true },
-        { name: "wednesday", required: true },
-        { name: "thursday", required: true },
-        { name: "friday", required: true },
-        { name: "saturday", required: true },
-        { name: "sunday", required: true },
-        { name: "start_date", required: true },
-        { name: "end_date", required: true },
-      ],
-    },
-    {
-      name: "calendar_dates",
-      fields: [
-        { name: "service_id", required: true },
-        { name: "date", required: true },
-        { name: "exception_type", required: true },
-      ],
-    },
-    {
-      name: "fare_attributes",
-      required: true,
-      fields: [
-        { name: "fare_id", required: true },
-        { name: "price", required: true },
-        { name: "currency_type", required: true },
-        { name: "payment_method", required: true },
-        { name: "transfers", required: true },
-      ],
-    },
-    {
-      name: "fare_rules",
-      fields: [{ name: "fare_id", required: true }],
-    },
-    {
-      name: "translations",
-      required: true,
-      fields: [
-        { name: "table_name", required: true },
-        { name: "field_name", required: true },
-        { name: "language", required: true },
-        { name: "translation", required: true },
-      ],
-    },
-    {
-      name: "shapes",
-      fields: [
-        { name: "shape_id", required: true },
-        { name: "shape_pt_lat", required: true },
-        { name: "shape_pt_lon", required: true },
-        { name: "shape_pt_sequence", required: true },
-      ],
-    },
-    {
-      name: "attributions",
-      presence: "recommended",
-      fields: [{ name: "organization_name", required: true }],
-    },
-    {
-      name: "transfers",
-      presence: "recommended",
-      fields: [{ name: "transfer_type", required: true }],
-    },
-    {
-      name: "frequencies",
-      fields: [
-        { name: "trip_id", required: true },
-        { name: "start_time", required: true },
-        { name: "end_time", required: true },
-        { name: "headway_secs", required: true },
-      ],
-    },
-  ],
-};
+interface RawField {
+  name: string;
+  presence: DefinitionPresence;
+  type?: string;
+  severity_if_missing?: Severity;
+  source_ref?: string;
+}
+interface RawFile {
+  name: string;
+  presence: DefinitionPresence;
+  source?: string;
+  source_ref?: string;
+  fields: RawField[];
+}
+interface RawProfile {
+  profile_id: string;
+  profile_version: string;
+  label: string;
+  extends?: string | null;
+  service_files_either_required?: boolean;
+  source_locks: string[];
+  files?: RawFile[];
+  extra_rules?: { code: string; severity: Severity; description: string; source?: string; source_ref?: string }[];
+}
 
-/** 旧GTFS-JP v3互換・取込保持用プロファイル。 */
-export const GTFS_JP_V3_LEGACY: Profile = {
-  ...GTFS_BASE,
-  id: "gtfs-jp-v3-legacy",
-  label: "GTFS-JP v3 legacy",
-};
+function normalizeField(f: RawField): FieldDefinition {
+  return {
+    name: f.name,
+    presence: f.presence,
+    type: f.type,
+    severityIfMissing: f.severity_if_missing,
+    sourceRef: f.source_ref,
+  };
+}
 
-/** GTFS-JP v4にGoogle Maps申請向けの実務品質ゲートを重ねるプロファイル。 */
-export const GOOGLE_TRANSIT_READY: Profile = {
-  ...GTFS_JP_V4,
-  id: "google-transit-ready",
-  label: "Google Transit ready",
-};
+function normalizeFile(f: RawFile): FileDefinition {
+  return {
+    name: f.name,
+    presence: f.presence,
+    source: f.source,
+    sourceRef: f.source_ref,
+    fields: f.fields.map(normalizeField),
+  };
+}
 
-export const PROFILES: Record<string, Profile> = {
-  [GTFS_BASE.id]: GTFS_BASE,
-  [GTFS_JP_V4.id]: GTFS_JP_V4,
-  [GTFS_JP_V3_LEGACY.id]: GTFS_JP_V3_LEGACY,
-  [GOOGLE_TRANSIT_READY.id]: GOOGLE_TRANSIT_READY,
-};
+function normalizeProfile(raw: RawProfile): ProfileDefinition {
+  return {
+    profileId: raw.profile_id,
+    profileVersion: raw.profile_version,
+    label: raw.label,
+    extends: raw.extends ?? null,
+    serviceFilesEitherRequired: raw.service_files_either_required,
+    sourceLocks: raw.source_locks as SpecLockId[],
+    files: raw.files?.map(normalizeFile),
+    extraRules: raw.extra_rules,
+  };
+}
+
+const RAW_DEFINITIONS: RawProfile[] = [
+  gtfsBaseRaw as RawProfile,
+  gtfsJpV4Raw as RawProfile,
+  gtfsJpV3LegacyRaw as RawProfile,
+  googleTransitReadyRaw as RawProfile,
+];
+
+// extends を解決し、files / service_files_either_required を継承する。
+const DEFINITIONS: Record<string, ProfileDefinition> = (() => {
+  const byId = new Map<string, ProfileDefinition>();
+  for (const raw of RAW_DEFINITIONS) byId.set(raw.profile_id, normalizeProfile(raw));
+
+  const resolved: Record<string, ProfileDefinition> = {};
+  function resolve(id: string): ProfileDefinition {
+    if (resolved[id]) return resolved[id]!;
+    const def = byId.get(id);
+    if (!def) throw new Error(`unknown profile definition: ${id}`);
+    if (!def.extends) {
+      resolved[id] = def;
+      return def;
+    }
+    const parent = resolve(def.extends);
+    const merged: ProfileDefinition = {
+      ...def,
+      files: def.files ?? parent.files,
+      serviceFilesEitherRequired:
+        def.serviceFilesEitherRequired ?? parent.serviceFilesEitherRequired,
+    };
+    resolved[id] = merged;
+    return merged;
+  }
+  for (const id of byId.keys()) resolve(id);
+  return resolved;
+})();
+
+// --- 定義 → 実行時 Profile への変換 -------------------------------------------
+
+function toFieldDef(f: FieldDefinition): FieldDef {
+  if (f.presence === "required") return { name: f.name, required: true };
+  if (f.presence === "recommended" || f.presence === "optional" || f.presence === "conditionallyRequired") {
+    return { name: f.name, presence: f.presence };
+  }
+  return { name: f.name };
+}
+
+function toFileDef(f: FileDefinition): FileDef {
+  const fields = f.fields.map(toFieldDef);
+  if (f.presence === "required") return { name: f.name, required: true, fields };
+  if (f.presence === "recommended" || f.presence === "legacy") {
+    return { name: f.name, presence: f.presence, fields };
+  }
+  // conditionallyRequired / optional は実行時には「必須でないファイル」として扱う。
+  return { name: f.name, fields };
+}
+
+/** ProfileDefinition を実行時の最小 Profile へ変換する。 */
+export function toProfile(def: ProfileDefinition): Profile {
+  return {
+    id: def.profileId,
+    label: def.label,
+    serviceFilesEitherRequired: def.serviceFilesEitherRequired ?? true,
+    files: (def.files ?? []).map(toFileDef),
+  };
+}
+
+// --- 公開API -----------------------------------------------------------------
+
+/** プロファイル定義（メタデータ込みの正本）を取得する。 */
+export function getProfileDefinition(id: string): ProfileDefinition {
+  const def = DEFINITIONS[id];
+  if (!def) throw new Error(`unknown profile: ${id}`);
+  return def;
+}
+
+/** 全プロファイル定義を返す。 */
+export function listProfileDefinitions(): ProfileDefinition[] {
+  return Object.values(DEFINITIONS);
+}
+
+/** プロファイルが採用する仕様ロック（10.2 source_locks）。 */
+export function sourceLocksForProfile(id: string): SpecLockId[] {
+  return [...getProfileDefinition(id).sourceLocks];
+}
+
+export const PROFILES: Record<string, Profile> = Object.fromEntries(
+  Object.values(DEFINITIONS).map((def) => [def.profileId, toProfile(def)]),
+);
 
 export function getProfile(id: string): Profile {
   const p = PROFILES[id];
   if (!p) throw new Error(`unknown profile: ${id}`);
   return p;
 }
+
+// 後方互換のための名前付き定数（JSON から導出）。
+export const GTFS_BASE: Profile = getProfile("gtfs-base");
+export const GTFS_JP_V4: Profile = getProfile("gtfs-jp-v4");
+export const GTFS_JP_V3_LEGACY: Profile = getProfile("gtfs-jp-v3-legacy");
+export const GOOGLE_TRANSIT_READY: Profile = getProfile("google-transit-ready");

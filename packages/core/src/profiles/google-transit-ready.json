@@ -1,0 +1,15 @@
+{
+  "profile_id": "google-transit-ready",
+  "profile_version": "2026-06-16.1",
+  "label": "Google Transit ready",
+  "extends": "gtfs-jp-v4",
+  "source_locks": ["GTFS_SCHEDULE_LOCK", "GTFS_JP_V4_LOCK", "GOOGLE_TRANSIT_LOCK"],
+  "extra_rules": [
+    { "code": "missing_shape_recommended", "severity": "warning", "description": "バス路線でshapes.txtがない", "source": "Google Transit", "source_ref": "shapes.txt" },
+    { "code": "missing_trip_headsign", "severity": "warning", "description": "trip_headsignがなくpatternからも補完できない" },
+    { "code": "feed_expired", "severity": "error", "description": "公開時点でサービス期間が終了している" },
+    { "code": "feed_expired_soon", "severity": "warning", "description": "feed_end_dateまたはcalendar最終日が近い" },
+    { "code": "unstable_public_ids", "severity": "warning", "description": "前版からstop_id/route_id/agency_idが大量変更されている" },
+    { "code": "missing_contact", "severity": "warning", "description": "agency/feed_infoに問い合わせ先がない" }
+  ]
+}

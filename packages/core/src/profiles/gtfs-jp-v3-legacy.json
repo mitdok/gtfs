@@ -1,0 +1,10 @@
+{
+  "profile_id": "gtfs-jp-v3-legacy",
+  "profile_version": "2026-06-16.1",
+  "label": "GTFS-JP v3 legacy",
+  "extends": "gtfs-base",
+  "source_locks": ["GTFS_SCHEDULE_LOCK", "GTFS_JP_V4_LOCK"],
+  "extra_rules": [
+    { "code": "legacy_jp_file", "severity": "info", "description": "v3互換プロファイルでは*_jp.txtを保持・再出力する" }
+  ]
+}

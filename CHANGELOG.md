@@ -3,6 +3,37 @@
 GTFS Studio（西沢ツールWEB版）の段階的実装の記録。仕様書（`docs/spec/`）に追従し、
 `packages/core` の取込・検証・移行・出力を一歩ずつ確実にしていく。
 
+## Unreleased — プロファイル定義のJSON外部化・仕様ロックストア（10.11 / 10.2）
+
+検証/出力プロファイルを TypeScript 定数から **JSON 定義（`src/profiles/*.json`）を
+正本**とするデータ駆動へ移行した。仕様 10.11「ルール定義データの必須項目」に沿って
+版・採用ロック・根拠仕様参照・追加ルールを保持し、仕様改定時は JSON 差し替えで追従できる。
+
+### 追加
+
+- **プロファイル定義のJSON外部化**（`packages/core/src/profiles/*.json`、
+  `src/profile-schema.ts`）。`profile_id` / `profile_version` / `source_locks` /
+  `files`（`presence` / `source` / `source_ref`）/ `extra_rules` を持つ。
+  `extends` で親プロファイルのファイル定義を継承する（v3-legacy←base、
+  google-transit-ready←gtfs-jp-v4）。
+- **`profile.ts` をJSONローダ化**。`getProfileDefinition` / `listProfileDefinitions` /
+  `sourceLocksForProfile` / `toProfile` を追加。実行時 `Profile`（validator が参照する
+  最小表現）は JSON 定義から導出し、`getProfile` の振る舞いは不変。
+- **仕様ロックストア**（`src/spec-lock.ts`、`createSpecLockStore`）。既定ロックを
+  起点に取得・上書き保存・未ロック判定・`snapshot()`（release-gate/acceptance 受け渡し）
+  を提供する（10.2「ロック状態はAPIで取得」）。永続化は api 層に委ねる。
+
+### 変更
+
+- `packages/core/tsconfig.json` に `resolveJsonModule` を追加。`build` で
+  `dist/profiles` へ JSON を複製（`scripts/copy-profiles.mjs`）。
+
+### テスト
+
+- `test/profile-data.test.ts`（5件）、`test/spec-lock-store.test.ts`（3件）を追加。
+  既存の検証/出力テストが JSON 由来プロファイルでも不変であることを確認。
+  コア全体で 68 → 76 件。
+
 ## Unreleased — 標準バリデータ連携・実データ検収（10.7 / 10.9 / 11章）
 
 公開前検証の最終段（標準GTFSバリデータ）と、最終OK判定（検収）の機械判定器を

@@ -1,0 +1,193 @@
+{
+  "profile_id": "gtfs-jp-v4",
+  "profile_version": "2026-06-16.1",
+  "label": "GTFS-JP v4",
+  "service_files_either_required": true,
+  "source_locks": ["GTFS_SCHEDULE_LOCK", "GTFS_JP_V4_LOCK"],
+  "files": [
+    {
+      "name": "feed_info",
+      "presence": "required",
+      "source": "GTFS-JP v4",
+      "source_ref": "feed_info.txt",
+      "fields": [
+        { "name": "feed_publisher_name", "presence": "required", "type": "text", "severity_if_missing": "error" },
+        { "name": "feed_publisher_url", "presence": "required", "type": "url", "severity_if_missing": "error" },
+        { "name": "feed_lang", "presence": "required", "type": "language", "severity_if_missing": "error" },
+        { "name": "feed_start_date", "presence": "required", "type": "date", "severity_if_missing": "error" },
+        { "name": "feed_end_date", "presence": "required", "type": "date", "severity_if_missing": "error" },
+        { "name": "feed_version", "presence": "required", "type": "text", "severity_if_missing": "error" }
+      ]
+    },
+    {
+      "name": "agency",
+      "presence": "required",
+      "source": "GTFS-JP v4",
+      "source_ref": "agency.txt",
+      "fields": [
+        { "name": "agency_id", "presence": "required", "type": "id", "severity_if_missing": "error" },
+        { "name": "agency_name", "presence": "required", "type": "text", "severity_if_missing": "error" },
+        { "name": "agency_url", "presence": "required", "type": "url", "severity_if_missing": "error" },
+        { "name": "agency_timezone", "presence": "required", "type": "timezone", "severity_if_missing": "error" },
+        { "name": "agency_lang", "presence": "required", "type": "language", "severity_if_missing": "error" }
+      ]
+    },
+    {
+      "name": "stops",
+      "presence": "required",
+      "source": "GTFS-JP v4",
+      "source_ref": "stops.txt",
+      "fields": [
+        { "name": "stop_id", "presence": "required", "type": "id", "severity_if_missing": "error" },
+        { "name": "stop_name", "presence": "required", "type": "text", "severity_if_missing": "error" },
+        { "name": "stop_lat", "presence": "required", "type": "latitude", "severity_if_missing": "error" },
+        { "name": "stop_lon", "presence": "required", "type": "longitude", "severity_if_missing": "error" },
+        { "name": "location_type", "presence": "required", "type": "enum", "severity_if_missing": "error" }
+      ]
+    },
+    {
+      "name": "routes",
+      "presence": "required",
+      "source": "GTFS-JP v4",
+      "source_ref": "routes.txt",
+      "fields": [
+        { "name": "route_id", "presence": "required", "type": "id", "severity_if_missing": "error" },
+        { "name": "agency_id", "presence": "required", "type": "id", "severity_if_missing": "error" },
+        { "name": "route_type", "presence": "required", "type": "enum", "severity_if_missing": "error" }
+      ]
+    },
+    {
+      "name": "trips",
+      "presence": "required",
+      "source": "GTFS-JP v4",
+      "source_ref": "trips.txt",
+      "fields": [
+        { "name": "route_id", "presence": "required", "type": "id", "severity_if_missing": "error" },
+        { "name": "service_id", "presence": "required", "type": "id", "severity_if_missing": "error" },
+        { "name": "trip_id", "presence": "required", "type": "id", "severity_if_missing": "error" }
+      ]
+    },
+    {
+      "name": "stop_times",
+      "presence": "required",
+      "source": "GTFS-JP v4",
+      "source_ref": "stop_times.txt",
+      "fields": [
+        { "name": "trip_id", "presence": "required", "type": "id", "severity_if_missing": "error" },
+        { "name": "stop_id", "presence": "required", "type": "id", "severity_if_missing": "error" },
+        { "name": "stop_sequence", "presence": "required", "type": "integer", "severity_if_missing": "error" }
+      ]
+    },
+    {
+      "name": "calendar",
+      "presence": "conditionallyRequired",
+      "source": "GTFS-JP v4",
+      "source_ref": "calendar.txt",
+      "fields": [
+        { "name": "service_id", "presence": "required" },
+        { "name": "monday", "presence": "required" },
+        { "name": "tuesday", "presence": "required" },
+        { "name": "wednesday", "presence": "required" },
+        { "name": "thursday", "presence": "required" },
+        { "name": "friday", "presence": "required" },
+        { "name": "saturday", "presence": "required" },
+        { "name": "sunday", "presence": "required" },
+        { "name": "start_date", "presence": "required" },
+        { "name": "end_date", "presence": "required" }
+      ]
+    },
+    {
+      "name": "calendar_dates",
+      "presence": "conditionallyRequired",
+      "source": "GTFS-JP v4",
+      "source_ref": "calendar_dates.txt",
+      "fields": [
+        { "name": "service_id", "presence": "required" },
+        { "name": "date", "presence": "required" },
+        { "name": "exception_type", "presence": "required" }
+      ]
+    },
+    {
+      "name": "fare_attributes",
+      "presence": "required",
+      "source": "GTFS-JP v4",
+      "source_ref": "fare_attributes.txt",
+      "fields": [
+        { "name": "fare_id", "presence": "required", "type": "id", "severity_if_missing": "error" },
+        { "name": "price", "presence": "required", "type": "number", "severity_if_missing": "error" },
+        { "name": "currency_type", "presence": "required", "type": "currency", "severity_if_missing": "error" },
+        { "name": "payment_method", "presence": "required", "type": "enum", "severity_if_missing": "error" },
+        { "name": "transfers", "presence": "required", "type": "enum", "severity_if_missing": "error" }
+      ]
+    },
+    {
+      "name": "fare_rules",
+      "presence": "conditionallyRequired",
+      "source": "GTFS-JP v4",
+      "source_ref": "fare_rules.txt",
+      "fields": [
+        { "name": "fare_id", "presence": "required", "type": "id", "severity_if_missing": "error" }
+      ]
+    },
+    {
+      "name": "translations",
+      "presence": "required",
+      "source": "GTFS-JP v4",
+      "source_ref": "translations.txt",
+      "fields": [
+        { "name": "table_name", "presence": "required", "type": "text", "severity_if_missing": "error" },
+        { "name": "field_name", "presence": "required", "type": "text", "severity_if_missing": "error" },
+        { "name": "language", "presence": "required", "type": "language", "severity_if_missing": "error" },
+        { "name": "translation", "presence": "required", "type": "text", "severity_if_missing": "error" }
+      ]
+    },
+    {
+      "name": "shapes",
+      "presence": "conditionallyRequired",
+      "source": "GTFS-JP v4",
+      "source_ref": "shapes.txt",
+      "fields": [
+        { "name": "shape_id", "presence": "required" },
+        { "name": "shape_pt_lat", "presence": "required" },
+        { "name": "shape_pt_lon", "presence": "required" },
+        { "name": "shape_pt_sequence", "presence": "required" }
+      ]
+    },
+    {
+      "name": "attributions",
+      "presence": "recommended",
+      "source": "GTFS-JP v4",
+      "source_ref": "attributions.txt",
+      "fields": [
+        { "name": "organization_name", "presence": "required", "type": "text", "severity_if_missing": "error" }
+      ]
+    },
+    {
+      "name": "transfers",
+      "presence": "recommended",
+      "source": "GTFS-JP v4",
+      "source_ref": "transfers.txt",
+      "fields": [
+        { "name": "transfer_type", "presence": "required", "type": "enum", "severity_if_missing": "error" }
+      ]
+    },
+    {
+      "name": "frequencies",
+      "presence": "optional",
+      "source": "GTFS-JP v4",
+      "source_ref": "frequencies.txt",
+      "fields": [
+        { "name": "trip_id", "presence": "required" },
+        { "name": "start_time", "presence": "required" },
+        { "name": "end_time", "presence": "required" },
+        { "name": "headway_secs", "presence": "required" }
+      ]
+    }
+  ],
+  "extra_rules": [
+    { "code": "missing_stop_name_kana", "severity": "error", "description": "GTFS-JP v4は読み仮名(ja-Hrkt)の設定が必須", "source": "GTFS-JP v4", "source_ref": "translations.txt" },
+    { "code": "legacy_jp_file", "severity": "warning", "description": "v3由来の*_jp.txtはv4ネイティブ出力では非推奨" },
+    { "code": "forbidden_v4_fixed_route_field", "severity": "error", "description": "固定路線MVPで条件付き禁止の項目(continuous_pickup等)" },
+    { "code": "forbidden_v4_network_file", "severity": "error", "description": "network_id設定時のnetworks/route_networks併用禁止" }
+  ]
+}

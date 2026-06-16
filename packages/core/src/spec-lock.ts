@@ -75,3 +75,45 @@ export function requiredSpecLocksForProfile(profileId: string): SpecLockId[] {
   }
   return ["GTFS_SCHEDULE_LOCK", "VALIDATOR_LOCK"];
 }
+
+/**
+ * 仕様ロックの保存・取得の口（10.2「ロック状態はAPIで取得できるように」）。
+ *
+ * 実体の永続化（DB/ファイル）は api 層が担い、コアは「現在のロック集合」を保持・
+ * 更新・判定するインメモリストアを提供する。既定値（SPEC_LOCKS）を起点に、
+ * validator結果由来の `VALIDATOR_LOCK` などを上書き保存できる。
+ */
+export interface SpecLockStore {
+  get(id: SpecLockId): SpecLock | undefined;
+  all(): SpecLock[];
+  /** ロックを保存（上書き）する。 */
+  set(lock: SpecLock): void;
+  isLocked(id: SpecLockId): boolean;
+  /** 指定IDのうち locked でないものを返す。 */
+  missing(ids: SpecLockId[]): SpecLockId[];
+  /** release-gate / acceptance へ渡す形（部分マップ）。 */
+  snapshot(): Partial<Record<SpecLockId, SpecLock>>;
+}
+
+export function createSpecLockStore(
+  initial: Partial<Record<SpecLockId, SpecLock>> = {},
+): SpecLockStore {
+  const locks: Record<string, SpecLock> = {};
+  for (const lock of Object.values({ ...SPEC_LOCKS, ...initial })) {
+    if (lock) locks[lock.id] = { ...lock, documents: lock.documents?.slice() };
+  }
+  return {
+    get: (id) => locks[id],
+    all: () => Object.values(locks).map((l) => ({ ...l, documents: l.documents?.slice() })),
+    set: (lock) => {
+      locks[lock.id] = { ...lock, documents: lock.documents?.slice() };
+    },
+    isLocked: (id) => locks[id]?.status === "locked",
+    missing: (ids) => ids.filter((id) => locks[id]?.status !== "locked"),
+    snapshot: () => {
+      const out: Partial<Record<SpecLockId, SpecLock>> = {};
+      for (const lock of Object.values(locks)) out[lock.id] = { ...lock };
+      return out;
+    },
+  };
+}

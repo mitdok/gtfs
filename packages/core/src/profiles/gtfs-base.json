@@ -1,0 +1,104 @@
+{
+  "profile_id": "gtfs-base",
+  "profile_version": "2026-06-16.1",
+  "label": "GTFS (base)",
+  "service_files_either_required": true,
+  "source_locks": ["GTFS_SCHEDULE_LOCK"],
+  "files": [
+    {
+      "name": "agency",
+      "presence": "required",
+      "source": "GTFS Schedule Reference",
+      "source_ref": "agency.txt",
+      "fields": [
+        { "name": "agency_name", "presence": "required", "type": "text", "severity_if_missing": "error" },
+        { "name": "agency_url", "presence": "required", "type": "url", "severity_if_missing": "error" },
+        { "name": "agency_timezone", "presence": "required", "type": "timezone", "severity_if_missing": "error" }
+      ]
+    },
+    {
+      "name": "stops",
+      "presence": "required",
+      "source": "GTFS Schedule Reference",
+      "source_ref": "stops.txt",
+      "fields": [
+        { "name": "stop_id", "presence": "required", "type": "id", "severity_if_missing": "error" },
+        { "name": "stop_name", "presence": "required", "type": "text", "severity_if_missing": "error" },
+        { "name": "stop_lat", "presence": "required", "type": "latitude", "severity_if_missing": "error" },
+        { "name": "stop_lon", "presence": "required", "type": "longitude", "severity_if_missing": "error" }
+      ]
+    },
+    {
+      "name": "routes",
+      "presence": "required",
+      "source": "GTFS Schedule Reference",
+      "source_ref": "routes.txt",
+      "fields": [
+        { "name": "route_id", "presence": "required", "type": "id", "severity_if_missing": "error" },
+        { "name": "route_type", "presence": "required", "type": "enum", "severity_if_missing": "error" }
+      ]
+    },
+    {
+      "name": "trips",
+      "presence": "required",
+      "source": "GTFS Schedule Reference",
+      "source_ref": "trips.txt",
+      "fields": [
+        { "name": "route_id", "presence": "required", "type": "id", "severity_if_missing": "error" },
+        { "name": "service_id", "presence": "required", "type": "id", "severity_if_missing": "error" },
+        { "name": "trip_id", "presence": "required", "type": "id", "severity_if_missing": "error" }
+      ]
+    },
+    {
+      "name": "stop_times",
+      "presence": "required",
+      "source": "GTFS Schedule Reference",
+      "source_ref": "stop_times.txt",
+      "fields": [
+        { "name": "trip_id", "presence": "required", "type": "id", "severity_if_missing": "error" },
+        { "name": "stop_id", "presence": "required", "type": "id", "severity_if_missing": "error" },
+        { "name": "stop_sequence", "presence": "required", "type": "integer", "severity_if_missing": "error" }
+      ]
+    },
+    {
+      "name": "calendar",
+      "presence": "conditionallyRequired",
+      "source": "GTFS Schedule Reference",
+      "source_ref": "calendar.txt",
+      "fields": [
+        { "name": "service_id", "presence": "required" },
+        { "name": "monday", "presence": "required" },
+        { "name": "tuesday", "presence": "required" },
+        { "name": "wednesday", "presence": "required" },
+        { "name": "thursday", "presence": "required" },
+        { "name": "friday", "presence": "required" },
+        { "name": "saturday", "presence": "required" },
+        { "name": "sunday", "presence": "required" },
+        { "name": "start_date", "presence": "required" },
+        { "name": "end_date", "presence": "required" }
+      ]
+    },
+    {
+      "name": "calendar_dates",
+      "presence": "conditionallyRequired",
+      "source": "GTFS Schedule Reference",
+      "source_ref": "calendar_dates.txt",
+      "fields": [
+        { "name": "service_id", "presence": "required" },
+        { "name": "date", "presence": "required" },
+        { "name": "exception_type", "presence": "required" }
+      ]
+    },
+    {
+      "name": "feed_info",
+      "presence": "conditionallyRequired",
+      "source": "GTFS Schedule Reference",
+      "source_ref": "feed_info.txt",
+      "fields": []
+    }
+  ],
+  "extra_rules": [
+    { "code": "service_empty", "severity": "error", "description": "曜日運行も例外追加もないservice_idを禁止する" },
+    { "code": "stop_time_decreasing", "severity": "error", "description": "停車時間を考慮した時刻の単調性違反を検出する" }
+  ]
+}

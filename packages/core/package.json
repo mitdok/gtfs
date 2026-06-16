@@ -14,7 +14,7 @@
   },
   "files": ["dist", "src"],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node ./scripts/copy-profiles.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

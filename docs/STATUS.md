@@ -5,7 +5,7 @@
 
 - 最終更新: 2026-06-16
 - 対象コミット: 本ファイルと同一リビジョン
-- コア・テスト: 68 件 pass（`pnpm --filter @gtfs-studio/core test`）
+- コア・テスト: 76 件 pass（`pnpm --filter @gtfs-studio/core test`）
 
 ## 1. パイプライン全体
 
@@ -21,15 +21,18 @@
 
 ## 2. プロファイル（仕様 10.1）
 
-| プロファイル | 定義 | 状態 |
-|--------------|------|------|
-| `gtfs-base` | `GTFS_BASE` | ✅ |
-| `gtfs-jp-v4` | `GTFS_JP_V4`（既定） | ✅ 中核要件 |
-| `gtfs-jp-v3-legacy` | `GTFS_JP_V3_LEGACY` | ✅（base派生） |
-| `google-transit-ready` | `GOOGLE_TRANSIT_READY` | ✅ MVP公開ゲート |
+| プロファイル | 正本データ | 状態 |
+|--------------|-----------|------|
+| `gtfs-base` | `src/profiles/gtfs-base.json` | ✅ |
+| `gtfs-jp-v4` | `src/profiles/gtfs-jp-v4.json`（既定） | ✅ 中核要件 |
+| `gtfs-jp-v3-legacy` | `gtfs-jp-v3-legacy.json`（`extends: gtfs-base`） | ✅ |
+| `google-transit-ready` | `google-transit-ready.json`（`extends: gtfs-jp-v4`） | ✅ MVP公開ゲート |
 
-> プロファイルは現状 `src/profile.ts` の TypeScript 定数。仕様 10.11 の
-> `profiles/*.json`（版・ロックID・source_ref 付き）への外部データ化は未着手。
+> プロファイルは **仕様 10.11 の JSON 定義（`src/profiles/*.json`）を正本**とし、
+> `profile.ts` が版（`profile_version`）・採用ロック（`source_locks`）・根拠仕様
+> （`source/source_ref`）・追加ルール（`extra_rules`）を保持したまま読み込み、
+> 実行時の最小 `Profile` を導出する（`getProfileDefinition` / `toProfile`）。
+> 仕様改定は JSON 差し替えで追従できる。
 
 ## 3. v3 → v4 移行の正規化（仕様 10.5 / `migration.ts`）
 
@@ -75,9 +78,10 @@
 | MobilityData Validator レポート取込（10.7 step3） | ✅ `report.json` 取込・集計 | `src/standard-validator.ts` |
 | validator結果からの `VALIDATOR_LOCK` 生成（11.2） | ✅ | `src/standard-validator.ts` |
 | 実データ検収 A-01〜A-10（11.1/11.5） | ✅ 判定器 | `src/acceptance.ts` |
-| 仕様ロックの永続化・API公開 | ⏳ 未実装（api層） | — |
+| プロファイル定義の外部データ化（10.11） | ✅ `src/profiles/*.json` 正本化 | `src/profile.ts`, `src/profile-schema.ts` |
+| 仕様ロックの保存・取得ストア（10.2） | ✅ インメモリ | `src/spec-lock.ts`（`createSpecLockStore`） |
+| 仕様ロックの永続化（DB/ファイル）・API公開 | ⏳ 未実装（api層） | — |
 | validator実体（Java）の起動 | ⏳ 別レイヤ（CLI/API） | — |
-| プロファイル定義の外部データ化（10.11） | ⏳ 未実装 | — |
 
 > validator の実行（Java実体の起動）はフレームワーク非依存のコアでは行わず、
 > 別レイヤが生成した `report.json` を `parseStandardValidatorReport` で取り込む。
@@ -85,8 +89,9 @@
 ## 6. 次の優先タスク（CHANGELOG「次の候補」と同期）
 
 1. ~~標準バリデータ連携（10.7）と実データ検収（10.9 / 11章）~~ … ✅ 完了（`standard-validator.ts` / `acceptance.ts`）。
-2. **プロファイル定義の JSON 外部化**（10.11）と**仕様ロック保存API**（10.2）。
+2. ~~プロファイル定義の JSON 外部化（10.11）と仕様ロック保存（10.2）~~ … ✅ 完了（`src/profiles/*.json` / `createSpecLockStore`）。
 3. **公開ゲートのWeb表示**：`evaluateReleaseGate` / `evaluateAcceptance` の blocker をUIで確認できるようにする。
+4. （以降）仕様ロックの永続化・API層、validator実体の起動連携。
 
 ## 7. GTFS-RT対応
 
