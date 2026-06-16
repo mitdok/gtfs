@@ -5,6 +5,7 @@ import type { ValidationReport } from "@gtfs-studio/core";
 
 interface Props {
   report: ValidationReport | null;
+  profileId: string;
 }
 
 const SEVERITY_LABEL: Record<string, string> = {
@@ -13,13 +14,14 @@ const SEVERITY_LABEL: Record<string, string> = {
   info: "情報",
 };
 
-export function ValidationView({ report }: Props) {
+export function ValidationView({ report, profileId }: Props) {
   if (!report) return <div className="empty">まだ検証されていません。</div>;
   const { errors, warnings, infos } = report.summary;
 
   return (
     <div className="validation-view">
       <div className="summary">
+        <span className="profile-pill">{profileId}</span>
         <span className="badge err">エラー {errors}</span>
         <span className="badge warn">警告 {warnings}</span>
         <span className="badge">情報 {infos}</span>

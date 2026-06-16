@@ -11,6 +11,14 @@ import { TimetableView } from "./components/TimetableView";
 import { ValidationView } from "./components/ValidationView";
 
 type Tab = "stops" | "timetable" | "validation";
+type ProfileId = "gtfs-jp-v4" | "google-transit-ready" | "gtfs-base" | "gtfs-jp-v3-legacy";
+
+const PROFILE_OPTIONS: { id: ProfileId; label: string }[] = [
+  { id: "gtfs-jp-v4", label: "GTFS-JP v4" },
+  { id: "google-transit-ready", label: "Google公開" },
+  { id: "gtfs-base", label: "GTFS基本" },
+  { id: "gtfs-jp-v3-legacy", label: "v3互換" },
+];
 
 export function App() {
   const feedRef = useRef<Feed | null>(null);
@@ -18,11 +26,15 @@ export function App() {
   const [report, setReport] = useState<ValidationReport | null>(null);
   const [fileName, setFileName] = useState<string>("");
   const [tab, setTab] = useState<Tab>("stops");
+  const [profileId, setProfileId] = useState<ProfileId>("gtfs-jp-v4");
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
 
-  const revalidate = useCallback((feed: Feed) => {
-    setReport(validateFeed(feed, { profileId: "gtfs-jp-v4" }));
-  }, []);
+  const revalidate = useCallback(
+    (feed: Feed, nextProfileId = profileId) => {
+      setReport(validateFeed(feed, { profileId: nextProfileId }));
+    },
+    [profileId],
+  );
 
   /** フィードへの変更はすべてこの関数経由（変更→版インクリメント→再検証） */
   const mutateFeed = useCallback(
@@ -52,7 +64,7 @@ export function App() {
   const onDownload = useCallback(() => {
     const feed = feedRef.current;
     if (!feed) return;
-    const bytes = exportToZip(feed);
+    const bytes = exportToZip(feed, { profileId });
     const blob = new Blob([bytes as BlobPart], { type: "application/zip" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -60,7 +72,16 @@ export function App() {
     a.download = "gtfs.zip";
     a.click();
     URL.revokeObjectURL(url);
-  }, []);
+  }, [profileId]);
+
+  const onProfileChange = useCallback(
+    (nextProfileId: ProfileId) => {
+      setProfileId(nextProfileId);
+      const feed = feedRef.current;
+      if (feed) revalidate(feed, nextProfileId);
+    },
+    [revalidate],
+  );
 
   const feed = feedRef.current;
   const summary = report?.summary;
@@ -95,6 +116,19 @@ export function App() {
           </button>
         )}
         <div className="spacer" />
+        <label className="profile-select">
+          <span>検証</span>
+          <select
+            value={profileId}
+            onChange={(e) => onProfileChange(e.target.value as ProfileId)}
+          >
+            {PROFILE_OPTIONS.map((profile) => (
+              <option key={profile.id} value={profile.id}>
+                {profile.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <button className="primary" disabled={!feed} onClick={onDownload}>
           gtfs.zip を出力
         </button>
@@ -139,7 +173,7 @@ export function App() {
             {tab === "timetable" && (
               <TimetableView feed={feed} version={version} mutateFeed={mutateFeed} />
             )}
-            {tab === "validation" && <ValidationView report={report} />}
+            {tab === "validation" && <ValidationView report={report} profileId={profileId} />}
           </main>
         </>
       )}

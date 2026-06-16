@@ -17,6 +17,11 @@ body {
 .header h1 { font-size: 16px; margin: 0 8px 0 0; }
 .header .filename { opacity: 0.8; font-size: 12px; }
 .header .spacer { flex: 1; }
+.profile-select { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #d7dee8; }
+.profile-select select {
+  height: 30px; border: 1px solid #5b6775; border-radius: 6px;
+  background: #fff; color: #222; padding: 0 8px; font-size: 13px;
+}
 
 button, .file-btn {
   font-size: 13px; padding: 6px 12px; border-radius: 6px; border: 1px solid #ccc;
@@ -87,6 +92,11 @@ input.time-cell.bad { background: #ffe5e9; border-color: #d7263d; }
 .validation-view { flex: 1; overflow: auto; padding: 16px; background: #fff; }
 .validation-view .summary { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
 .validation-view .badge { color: #fff; background: #888; }
+.profile-pill {
+  display: inline-flex; align-items: center; height: 24px; padding: 0 8px;
+  border: 1px solid #d0d7de; border-radius: 999px; background: #f6f8fa;
+  color: #57606a; font-family: ui-monospace, monospace; font-size: 12px;
+}
 .ok-note { color: #2ea043; font-weight: 600; }
 .err-note { color: #d7263d; }
 table.issues td, table.issues th { white-space: normal; }

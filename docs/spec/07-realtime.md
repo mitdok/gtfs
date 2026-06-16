@@ -2,6 +2,8 @@
 
 > 本機能は **フェーズ2以降**。静的GTFS-JPの安定運用を前提に段階導入する。本サービス単体ではリアルタイム情報を「生成」せず、外部ソース（車載器・運行管理システム・自治体ロケーションシステム）からの入力を取り込み、GTFS-RTとして整形・配信する。
 
+実装ロードマップ、課題、達成管理は [`../GTFS_RT_ROADMAP.md`](../GTFS_RT_ROADMAP.md) で管理する。
+
 ## 7.1 GTFS-RTの3フィード
 
 | フィード | エンティティ | 用途 |
@@ -47,6 +49,10 @@ GTFS-RTは静的GTFSの `trip_id` / `stop_id` / `route_id` を参照する。入
 - 配信前段にキャッシュ（短TTL）。アプリは生成、配信はエッジ、を分離。
 - デバッグ用にJSON版（`?format=json`）を提供。
 
+公式Best Practicesに合わせ、TripUpdate / VehiclePosition はデータ年齢90秒以内、
+Alertは10分以内を運用品質目標とする。FeedHeader.timestampは変更がない場合でも
+30秒程度で更新し、情報が有効であることを示す。
+
 ## 7.5 データ保持・性能
 - `rt_vehicle_positions` 等はホットストア（インメモリ/Redis等）で直近のみ保持、長期は集計のみ。
 - 1フィードあたり車両数十〜数百規模を想定。水平スケール可能な配信層。
@@ -61,3 +67,6 @@ GTFS-RTは静的GTFSの `trip_id` / `stop_id` / `route_id` を参照する。入
 - **2-a**: Alertの手動投入＋配信（最小構成。事業者が運休告知をすぐ出せる価値）。
 - **2-b**: 外部GTFS-RT中継・正規化配信。
 - **2-c**: 位置情報プッシュからのTripUpdate/VehiclePosition自動生成（突合エンジン）。
+
+達成基準は PoC / Alpha / Beta / MVP / 実務OK の5段階で判定する。
+詳細は [`../GTFS_RT_ROADMAP.md`](../GTFS_RT_ROADMAP.md#5-達成基準) を参照。

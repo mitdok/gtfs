@@ -3,6 +3,82 @@
 GTFS Studio（西沢ツールWEB版）の段階的実装の記録。仕様書（`docs/spec/`）に追従し、
 `packages/core` の取込・検証・移行・出力を一歩ずつ確実にしていく。
 
+## Unreleased — GTFS-RT対応ロードマップ・達成管理
+
+GTFS-RT対応をフェーズ2として進められるよう、ロードマップ、課題、達成管理表を整備した。
+
+### 追加
+
+- **`docs/GTFS_RT_ROADMAP.md` を追加**。
+  GTFS Realtime Reference v2.0、TripUpdates / VehiclePositions / ServiceAlerts、
+  protobuf配信、鮮度SLOを前提に、RT-0〜RT-5のフェーズ、タスク、受入基準、課題、達成基準を定義した。
+- **07章 GTFS-RT仕様に達成管理リンクと鮮度目標を追加**。
+  TripUpdates / VehiclePositions は90秒以内、Alertsは10分以内を運用品質目標とする。
+- **API仕様のRT節を具体化**。
+  RT source CRUD、source status、手動Alert CRUD、RT smoke検証、source/status/AlertのJSON例を追加した。
+- **STATUSにGTFS-RTフェーズ表を追加**。
+
+## Unreleased — 公開ゲートとWeb検証プロファイル切替
+
+v4実務検証を画面から使えるようにし、公開前ブロック条件を機械判定する土台を追加した。
+
+### 追加
+
+- **Web UIに検証プロファイル切替を追加**。
+  `gtfs-jp-v4` / `google-transit-ready` / `gtfs-base` / `gtfs-jp-v3-legacy` を選べるようにし、
+  切替時に即再検証する。zip出力も選択中プロファイルを使う。
+- **仕様ロック定義を追加**（`packages/core/src/spec-lock.ts`）。
+  `GTFS_SCHEDULE_LOCK` / `GTFS_JP_V4_LOCK` / `GOOGLE_TRANSIT_LOCK` / `VALIDATOR_LOCK`
+  を公開判定用の監査情報として扱う。validator lock は連携未実装のため現時点では missing。
+- **公開可否ゲートを追加**（`packages/core/src/release-gate.ts`）。
+  profile error、仕様ロック欠落、標準validator未実行/error、実データ検収・公開URL検証の
+  ブロッカーを `ready` / `not_ready` に集約する。
+
+### テスト
+
+- `test/release-gate.test.ts`（3件）を追加。コア全体で 56 → 59 件。
+
+## Unreleased — v4実務検証とGoogle公開ゲート強化
+
+GTFS-JP v4固定路線バスMVPで実運用時に見落としやすい条件付きルールと、
+Google Maps申請前の実務品質ゲートを追加した。
+
+### 追加
+
+- **GTFS-JP v4条件付き検証を追加**（`packages/core/src/validator.ts`）。
+  固定路線MVPでのFlex/Network系禁止フィールド、`shapes.txt`出力時の
+  `trips.shape_id`、shape座標・sequence、translations対象キー、運賃値、
+  attributions役割、transfers端点・種別を検証する。
+- **`google-transit-ready` プロファイルを追加**（`packages/core/src/profile.ts`）。
+  v4準拠に、shape推奨、trip_headsign、feed期限切れ/期限間近、問い合わせ先、
+  前版比較による公開ID大量変更の警告を重ねる。
+- **Web UIのzip出力を `gtfs-jp-v4` プロファイル経由に変更**。
+  取込保持したlegacyファイルや空の任意ファイルを公開用zipに混ぜない。
+
+### テスト
+
+- `test/validator-v4.test.ts` と `test/google-transit-ready.test.ts` を追加。
+  コア全体で 49 → 56 件。
+
+## Unreleased — 出力プロファイル準拠フィルタ
+
+GTFS-JP v4 ネイティブ出力と v3 互換保持を分離した。内部モデルはロスレスに保持しつつ、
+公開用出力ではプロファイルに沿って不要なファイルを落とせる。
+
+### 追加
+
+- **`applyExportProfile` を追加**（`packages/core/src/export-profile.ts`）。
+  `gtfs-jp-v4` / `gtfs-base` 出力では legacy `*_jp.txt` を除外し、
+  `gtfs-jp-v3-legacy` では保持する。
+- **空の任意ファイル省略**を追加。プロファイル上必須の空ファイルは残し、
+  検証側で `empty_required_file` として扱えるようにした。
+- **`exportToFiles` / `exportToZip` に `profileId` オプションを追加**。
+  既存呼び出しはそのまま全テーブル出力、プロファイル指定時だけフィルタを適用する。
+
+### テスト
+
+- `test/export-profile.test.ts`（5件）を追加。コア全体で 44 → 49 件。
+
 ## Unreleased — Shift_JIS 取込（文字コード自動判定）
 
 旧・西沢ツールや v3 系の実フィードに残る Shift_JIS を取り込めるようにした
@@ -67,7 +143,6 @@ GTFS Studio（西沢ツールWEB版）の段階的実装の記録。仕様書（
 
 ### 次の候補（未着手）
 
-- `google-transit-ready` プロファイル（仕様 10.6: `feed_expired` / `missing_shape_recommended`
-  / 安定ID変化検知など）。
-- Shift_JIS 取込（旧・西沢ツール/v3 CSV 由来フィードの文字コード対応、`importer.ts`）。
-- 出力時のプロファイル準拠フィルタ（v4出力でのv3拡張ファイル除外、空任意ファイルの省略）。
+- 標準バリデータ連携（仕様 10.7）と実データ検収（仕様 10.9 / 11章）。
+- プロファイル定義の JSON 外部化（仕様 10.11）と仕様ロック保存API（仕様 10.2）。
+- 公開ゲートのWeb表示（blocker一覧・標準validator実行結果の取り込み）。

@@ -10,4 +10,7 @@ export * from "./encoding.js";
 export * from "./importer.js";
 export * from "./migration.js";
 export * from "./validator.js";
+export * from "./spec-lock.js";
+export * from "./release-gate.js";
+export * from "./export-profile.js";
 export * from "./exporter.js";

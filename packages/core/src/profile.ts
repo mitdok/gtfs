@@ -265,10 +265,18 @@ export const GTFS_JP_V3_LEGACY: Profile = {
   label: "GTFS-JP v3 legacy",
 };
 
+/** GTFS-JP v4にGoogle Maps申請向けの実務品質ゲートを重ねるプロファイル。 */
+export const GOOGLE_TRANSIT_READY: Profile = {
+  ...GTFS_JP_V4,
+  id: "google-transit-ready",
+  label: "Google Transit ready",
+};
+
 export const PROFILES: Record<string, Profile> = {
   [GTFS_BASE.id]: GTFS_BASE,
   [GTFS_JP_V4.id]: GTFS_JP_V4,
   [GTFS_JP_V3_LEGACY.id]: GTFS_JP_V3_LEGACY,
+  [GOOGLE_TRANSIT_READY.id]: GOOGLE_TRANSIT_READY,
 };
 
 export function getProfile(id: string): Profile {

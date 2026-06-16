@@ -9,21 +9,29 @@
  */
 import { zipSync, strToU8 } from "fflate";
 import { writeCsv } from "./csv.js";
+import { applyExportProfile, type ExportProfileOptions } from "./export-profile.js";
 import type { Feed } from "./model.js";
 
 export interface ExportOptions {
   /** 出力するファイルを限定する場合に指定（拡張子なし名）。既定は全テーブル。 */
   only?: string[];
+  /** 出力プロファイル。指定時はプロファイル準拠フィルタを適用する。 */
+  profileId?: string;
+  /** 出力プロファイル準拠フィルタの詳細オプション。 */
+  exportProfile?: ExportProfileOptions;
 }
 
 /** 各 .txt の文字列を生成（テスト/プレビュー用）。 */
 export function exportToFiles(feed: Feed, options: ExportOptions = {}): Record<string, string> {
-  const names = [...feed.tables.keys()]
+  const exportFeed = options.profileId
+    ? applyExportProfile(feed, options.profileId, options.exportProfile).feed
+    : feed;
+  const names = [...exportFeed.tables.keys()]
     .filter((n) => !options.only || options.only.includes(n))
     .sort();
   const out: Record<string, string> = {};
   for (const name of names) {
-    const table = feed.tables.get(name)!;
+    const table = exportFeed.tables.get(name)!;
     out[`${name}.txt`] = writeCsv(table.columns, table.rows);
   }
   return out;

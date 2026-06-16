@@ -5,7 +5,7 @@
 
 - 最終更新: 2026-06-16
 - 対象コミット: 本ファイルと同一リビジョン
-- コア・テスト: 44 件 pass（`pnpm --filter @gtfs-studio/core test`）
+- コア・テスト: 59 件 pass（`pnpm --filter @gtfs-studio/core test`）
 
 ## 1. パイプライン全体
 
@@ -16,7 +16,8 @@
 | v3 → v4 移行 | `migrateToGtfsJpV4` | ✅ MVP範囲 | `src/migration.ts` |
 | 検証 | `validateFeed` | ✅ 層1＋層2一部 | `src/validator.ts`, `src/profile.ts` |
 | 出力（内部モデル → zip） | `exportGtfsZip` | ✅ 基本 | `src/exporter.ts` |
-| 出力プロファイル準拠フィルタ | — | ⏳ 未実装 | （次タスク） |
+| 出力プロファイル準拠フィルタ | `applyExportProfile` / `ExportOptions.profileId` | ✅ | `src/export-profile.ts`, `src/exporter.ts` |
+| 公開可否ゲート | `evaluateReleaseGate` | ✅ 標準validator結果の受け口まで | `src/release-gate.ts`, `src/spec-lock.ts` |
 
 ## 2. プロファイル（仕様 10.1）
 
@@ -25,7 +26,7 @@
 | `gtfs-base` | `GTFS_BASE` | ✅ |
 | `gtfs-jp-v4` | `GTFS_JP_V4`（既定） | ✅ 中核要件 |
 | `gtfs-jp-v3-legacy` | `GTFS_JP_V3_LEGACY` | ✅（base派生） |
-| `google-transit-ready` | — | ⏳ 未実装（10.6） |
+| `google-transit-ready` | `GOOGLE_TRANSIT_READY` | ✅ MVP公開ゲート |
 
 > プロファイルは現状 `src/profile.ts` の TypeScript 定数。仕様 10.11 の
 > `profiles/*.json`（版・ロックID・source_ref 付き）への外部データ化は未着手。
@@ -58,26 +59,41 @@
 | stop_times | `invalid_time_format`, `duplicate_stop_sequence`, `departure_before_arrival`, `stop_time_decreasing`（停車時間考慮） |
 | calendar | `invalid_date_format`, `calendar_end_before_start`, `invalid_calendar_day_flag`, `service_empty`, `invalid_exception_type` |
 | GTFS-JP | `legacy_jp_file`, `missing_stop_name_kana`, `invalid_fare_price`, `non_jpy_fare_currency` |
+| GTFS-JP v4 条件付き | `forbidden_v4_fixed_route_field`, `forbidden_v4_network_file`, `missing_trip_shape_id`, `invalid_shape_pt_lat`, `invalid_shape_pt_lon`, `duplicate_shape_pt_sequence`, `missing_translation_record_key`, `invalid_fare_payment_method`, `invalid_fare_transfers`, `missing_attribution_role`, `missing_transfer_endpoint`, `invalid_transfer_type` |
 | feed_info | `feed_info_date_range` |
+| Google公開ゲート | `missing_shape_recommended`, `missing_trip_headsign`, `feed_expired`, `feed_expired_soon`, `unstable_public_ids`, `missing_contact` |
 
-### ⏳ 未実装（`google-transit-ready` 公開ゲート 10.6）
+### ⏳ 未実装（残タスク）
 
-`missing_shape_recommended` / `missing_trip_headsign` / `feed_expired` /
-`feed_expired_soon` / `unstable_public_ids` / `missing_contact`
+標準バリデータ連携、仕様ロック保存、実データ検収、プロファイル定義のJSON外部化。
 
 ## 5. 仕様ロック・標準バリデータ連携（仕様 10.2 / 10.7 / 10.10）
 
 | 項目 | 状態 |
 |------|------|
 | 仕様ロック（`GTFS_JP_V4_LOCK` 等）の保存・API公開 | ⏳ 未実装 |
+| core内の仕様ロック定義・公開可否判定 | ✅ MVP |
 | MobilityData Canonical Validator 連携（10.7 step3） | ⏳ 未実装 |
 | プロファイル定義の外部データ化（10.11） | ⏳ 未実装 |
 
 ## 6. 次の優先タスク（CHANGELOG「次の候補」と同期）
 
-1. **出力プロファイル準拠フィルタ**：v4出力で v3拡張ファイルを除外、空の任意ファイルを省略。
-2. **`google-transit-ready` プロファイル**：4節の未実装公開ゲートを追加。
-3. **プロファイル定義の JSON 外部化**（10.11）と**仕様ロック保存**（10.2）。
-4. **標準バリデータ連携**（10.7）と**実データ検収**（10.9 / 11章）。
+1. **標準バリデータ連携**（10.7）と**実データ検収**（10.9 / 11章）。
+2. **プロファイル定義の JSON 外部化**（10.11）と**仕様ロック保存API**（10.2）。
+3. **公開ゲートのWeb表示**：`evaluateReleaseGate` の blocker をUIで確認できるようにする。
+
+## 7. GTFS-RT対応
+
+GTFS-RTはフェーズ2以降の対象。ロードマップ、課題、達成管理は
+[`GTFS_RT_ROADMAP.md`](./GTFS_RT_ROADMAP.md) に集約する。
+
+| フェーズ | 状態 | 内容 |
+|----------|------|------|
+| RT-0 | ✅ 着手 | 公式参照確認、ロードマップ・課題・達成管理表の整備 |
+| RT-1 | ⏳ 未着手 | ServiceAlerts手動投入＋protobuf配信 |
+| RT-2 | ⏳ 未着手 | 外部GTFS-RT中継・正規化 |
+| RT-3 | ⏳ 未着手 | VehiclePositions取込・配信 |
+| RT-4 | ⏳ 未着手 | TripUpdates生成・静的GTFS突合 |
+| RT-5 | ⏳ 未着手 | 鮮度SLO、監視、公開URL検証 |
 
 > 凡例: ✅ 実装済 / ⏳ 未実装・予定。

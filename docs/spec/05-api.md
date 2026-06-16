@@ -240,9 +240,89 @@ CDN/オブジェクトストレージ配信を前提とし、安定URLを提供�
 
 | メソッド | パス | 説明 |
 |----------|------|------|
-| GET/POST | `/projects/{project}/rt/sources` | RTソース定義 |
-| POST | `/projects/{project}/rt/ingest` | 車両位置等のプッシュ受信（認証付） |
+| GET | `/projects/{project}/rt/sources` | RTソース定義一覧 |
+| POST | `/projects/{project}/rt/sources` | RTソース定義作成（外部GTFS-RT中継/API/GPSプッシュ） |
+| GET | `/projects/{project}/rt/sources/{source}` | RTソース定義取得 |
+| PATCH | `/projects/{project}/rt/sources/{source}` | RTソース定義更新 |
+| DELETE | `/projects/{project}/rt/sources/{source}` | RTソース停止・削除 |
+| GET | `/projects/{project}/rt/sources/{source}/status` | 最終取得時刻、age、decode error、HTTP error等の状態 |
+| POST | `/projects/{project}/rt/ingest` | 車両位置等のプッシュ受信（source token認証付） |
+| GET | `/projects/{project}/rt/alerts` | 手動Alert一覧 |
 | POST | `/projects/{project}/rt/alerts` | Alert手動投入 |
+| PATCH | `/projects/{project}/rt/alerts/{alert}` | Alert更新 |
+| DELETE | `/projects/{project}/rt/alerts/{alert}` | Alert終了・削除 |
+| POST | `/projects/{project}/rt/smoke` | 公開RT URLを取得し、protobuf decode・鮮度を検証 |
+
+RTソース定義例:
+
+```jsonc
+{
+  "id": "vehicle-api-1",
+  "type": "external_gtfs_rt", // external_gtfs_rt | vehicle_position_push | operations_api
+  "feed_type": "vehicle_positions", // trip_updates | vehicle_positions | alerts
+  "endpoint": "https://example.com/vehicle-positions.pb",
+  "auth": { "type": "bearer", "secret_ref": "..." },
+  "poll_interval_seconds": 30,
+  "mapping_config": {
+    "static_revision_id": "rev_20260401",
+    "route_id_field": "route_id",
+    "trip_id_field": "trip_id"
+  },
+  "enabled": true
+}
+```
+
+RTソース状態例:
+
+```jsonc
+{
+  "source_id": "vehicle-api-1",
+  "feed_type": "vehicle_positions",
+  "last_success_at": "2026-06-16T02:00:00Z",
+  "last_attempt_at": "2026-06-16T02:00:30Z",
+  "feed_header_timestamp": 1781575200,
+  "age_seconds": 28,
+  "entity_count": 42,
+  "stale": false,
+  "last_error": null
+}
+```
+
+Alert登録例:
+
+```jsonc
+{
+  "active_period": { "start": "2026-06-16T09:00:00+09:00", "end": "2026-06-16T18:00:00+09:00" },
+  "informed_entities": [
+    { "route_id": "R1" },
+    { "stop_id": "S10" }
+  ],
+  "cause": "CONSTRUCTION",
+  "effect": "DETOUR",
+  "header_text": { "ja": "工事による迂回運行" },
+  "description_text": { "ja": "市役所前停留所は終日休止します。" },
+  "url": { "ja": "https://example.com/alerts/20260616" }
+}
+```
+
+RT smoke結果例:
+
+```jsonc
+{
+  "status": "pass",
+  "checked_at": "2026-06-16T02:01:00Z",
+  "feeds": [
+    {
+      "feed_type": "vehicle_positions",
+      "url": "https://feeds.example/rt/org/feed/vehicle-positions.pb",
+      "protobuf_decode": "pass",
+      "entity_count": 42,
+      "age_seconds": 35,
+      "stale": false
+    }
+  ]
+}
+```
 
 ## 5.11 Webhook / 通知
 - 公開完了・検証失敗・施行日到来をWebhook（署名付）/メールで通知。

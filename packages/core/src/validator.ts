@@ -25,6 +25,10 @@ export interface ValidationReport {
 
 export interface ValidateOptions {
   profileId?: string;
+  /** 日付依存の公開ゲート検証に使う基準日（YYYYMMDD）。既定は実行日。 */
+  validationDate?: string;
+  /** 公開IDの大量変更を検出するための前版フィード。 */
+  previousFeed?: Feed;
 }
 
 export function validateFeed(feed: Feed, options: ValidateOptions = {}): ValidationReport {
@@ -41,7 +45,12 @@ export function validateFeed(feed: Feed, options: ValidateOptions = {}): Validat
   checkStopTimes(feed, issues);
   checkCalendar(feed, issues);
   checkConditionalGtfsRules(feed, issues);
-  if (profileId === "gtfs-jp-v4") checkGtfsJpV4(feed, issues);
+  if (profileId === "gtfs-jp-v4" || profileId === "google-transit-ready") {
+    checkGtfsJpV4(feed, issues);
+  }
+  if (profileId === "google-transit-ready") {
+    checkGoogleTransitReady(feed, issues, options);
+  }
 
   return { issues, summary: summarize(issues) };
 }
@@ -191,6 +200,7 @@ function checkUniqueIds(feed: Feed, issues: ValidationIssue[]) {
 function checkReferences(feed: Feed, issues: ValidationIssue[]) {
   const stopIds = idSet(feed, "stops", "stop_id");
   const routeIds = idSet(feed, "routes", "route_id");
+  const shapeIds = idSet(feed, "shapes", "shape_id");
   const tripIds = idSet(feed, "trips", "trip_id");
   const agencyIds = idSet(feed, "agency", "agency_id");
   const serviceIds = new Set<string>([
@@ -215,6 +225,10 @@ function checkReferences(feed: Feed, issues: ValidationIssue[]) {
     const sid = (row["service_id"] ?? "").trim();
     if (sid !== "" && !serviceIds.has(sid)) {
       issues.push(ref("trips", "trip_id", row, "service_id", sid, "calendar/calendar_dates"));
+    }
+    const shapeId = (row["shape_id"] ?? "").trim();
+    if (shapeId !== "" && shapeIds.size > 0 && !shapeIds.has(shapeId)) {
+      issues.push(ref("trips", "trip_id", row, "shape_id", shapeId, "shapes"));
     }
   }
   // stop_times.trip_id -> trips, stop_times.stop_id -> stops
@@ -471,8 +485,12 @@ function checkCalendar(feed: Feed, issues: ValidationIssue[]) {
 
 function checkGtfsJpV4(feed: Feed, issues: ValidationIssue[]) {
   checkLegacyJpFiles(feed, issues);
+  checkGtfsJpV4ForbiddenFields(feed, issues);
+  checkGtfsJpV4Shapes(feed, issues);
   checkGtfsJpTranslations(feed, issues);
   checkGtfsJpFareAttributes(feed, issues);
+  checkGtfsJpAttributions(feed, issues);
+  checkGtfsJpTransfers(feed, issues);
   checkFeedInfoDates(feed, issues);
 }
 
@@ -490,26 +508,131 @@ function checkLegacyJpFiles(feed: Feed, issues: ValidationIssue[]) {
   }
 }
 
+function checkGtfsJpV4ForbiddenFields(feed: Feed, issues: ValidationIssue[]) {
+  for (const { table, fields } of [
+    {
+      table: "routes",
+      fields: ["continuous_pickup", "continuous_drop_off", "network_id"],
+    },
+    {
+      table: "stop_times",
+      fields: ["location_group_id", "location_id", "continuous_pickup", "continuous_drop_off"],
+    },
+  ]) {
+    for (const row of getRows(feed, table)) {
+      const id = row["route_id"] ?? row["trip_id"] ?? "";
+      for (const field of fields) {
+        const value = (row[field] ?? "").trim();
+        if (value === "") continue;
+        issues.push({
+          severity: "error",
+          code: "forbidden_v4_fixed_route_field",
+          message: `${table}.txt の ${field} はGTFS-JP v4固定路線MVPでは使用できません`,
+          entity: { type: table, id: id.trim(), field, value },
+        });
+      }
+    }
+  }
+
+  const hasRouteNetworkId = getRows(feed, "routes").some(
+    (row) => (row["network_id"] ?? "").trim() !== "",
+  );
+  if (!hasRouteNetworkId) return;
+  for (const name of ["networks", "route_networks"]) {
+    if (!feed.tables.has(name)) continue;
+    issues.push({
+      severity: "error",
+      code: "forbidden_v4_network_file",
+      message: `routes.network_id を使う場合、GTFS-JP v4では ${name}.txt を含められません`,
+      entity: { type: "file", id: name },
+    });
+  }
+}
+
+function checkGtfsJpV4Shapes(feed: Feed, issues: ValidationIssue[]) {
+  const shapes = feed.tables.get("shapes");
+  if (!shapes || shapes.rows.length === 0) return;
+
+  for (const row of getRows(feed, "trips")) {
+    if ((row["shape_id"] ?? "").trim() !== "") continue;
+    issues.push({
+      severity: "error",
+      code: "missing_trip_shape_id",
+      message: `shapes.txt を出力する場合、trips.txt trip_id="${row["trip_id"] ?? ""}" の shape_id が必要です`,
+      entity: { type: "trips", id: (row["trip_id"] ?? "").trim(), field: "shape_id" },
+    });
+  }
+
+  const byShape = new Map<string, Set<string>>();
+  for (const row of shapes.rows) {
+    const id = (row["shape_id"] ?? "").trim();
+    const seq = (row["shape_pt_sequence"] ?? "").trim();
+    const lat = (row["shape_pt_lat"] ?? "").trim();
+    const lon = (row["shape_pt_lon"] ?? "").trim();
+    const latN = Number(lat);
+    const lonN = Number(lon);
+    if (lat === "" || Number.isNaN(latN) || latN < -90 || latN > 90) {
+      issues.push({
+        severity: "error",
+        code: "invalid_shape_pt_lat",
+        message: `shapes.txt shape_id="${id}" の shape_pt_lat が不正です: "${lat}"`,
+        entity: { type: "shapes", id, field: "shape_pt_lat", sequence: seq },
+      });
+    }
+    if (lon === "" || Number.isNaN(lonN) || lonN < -180 || lonN > 180) {
+      issues.push({
+        severity: "error",
+        code: "invalid_shape_pt_lon",
+        message: `shapes.txt shape_id="${id}" の shape_pt_lon が不正です: "${lon}"`,
+        entity: { type: "shapes", id, field: "shape_pt_lon", sequence: seq },
+      });
+    }
+    const seen = byShape.get(id) ?? new Set<string>();
+    if (seq !== "" && seen.has(seq)) {
+      issues.push({
+        severity: "error",
+        code: "duplicate_shape_pt_sequence",
+        message: `shapes.txt shape_id="${id}" で shape_pt_sequence=${seq} が重複しています`,
+        entity: { type: "shapes", id, sequence: seq },
+      });
+    }
+    if (seq !== "") seen.add(seq);
+    byShape.set(id, seen);
+  }
+}
+
 function checkGtfsJpTranslations(feed: Feed, issues: ValidationIssue[]) {
   const translations = getRows(feed, "translations");
   if (translations.length === 0) return;
 
   const stopKanaIds = new Set<string>();
+  const stopKanaFieldValues = new Set<string>();
   for (const row of translations) {
+    const recordId = (row["record_id"] ?? "").trim();
+    const fieldValue = (row["field_value"] ?? "").trim();
+    if (recordId === "" && fieldValue === "") {
+      issues.push({
+        severity: "error",
+        code: "missing_translation_record_key",
+        message: "translations.txt は record_id または field_value のどちらかで対象レコードを指定してください",
+        entity: { type: "translations", table_name: row["table_name"], field_name: row["field_name"] },
+      });
+    }
     if (
       (row["table_name"] ?? "").trim() === "stops" &&
       (row["field_name"] ?? "").trim() === "stop_name" &&
       (row["language"] ?? "").trim() === "ja-Hrkt"
     ) {
-      const id = (row["record_id"] ?? "").trim();
-      if (id !== "") stopKanaIds.add(id);
+      if (recordId !== "") stopKanaIds.add(recordId);
+      if (fieldValue !== "") stopKanaFieldValues.add(fieldValue);
     }
   }
 
   const missing: string[] = [];
   for (const row of getRows(feed, "stops")) {
     const id = (row["stop_id"] ?? "").trim();
-    if (id !== "" && !stopKanaIds.has(id)) missing.push(id);
+    const name = (row["stop_name"] ?? "").trim();
+    if (id !== "" && !stopKanaIds.has(id) && !stopKanaFieldValues.has(name)) missing.push(id);
   }
   if (missing.length > 0) {
     issues.push({
@@ -542,6 +665,65 @@ function checkGtfsJpFareAttributes(feed: Feed, issues: ValidationIssue[]) {
         entity: { type: "fare_attributes", id, field: "currency_type" },
       });
     }
+    const paymentMethod = (row["payment_method"] ?? "").trim();
+    if (paymentMethod !== "" && paymentMethod !== "0" && paymentMethod !== "1") {
+      issues.push({
+        severity: "error",
+        code: "invalid_fare_payment_method",
+        message: `fare_attributes.txt fare_id="${id}" の payment_method は 0 か 1 です`,
+        entity: { type: "fare_attributes", id, field: "payment_method" },
+      });
+    }
+    const transfers = (row["transfers"] ?? "").trim();
+    if (transfers !== "" && transfers !== "0" && transfers !== "1" && transfers !== "2") {
+      issues.push({
+        severity: "error",
+        code: "invalid_fare_transfers",
+        message: `fare_attributes.txt fare_id="${id}" の transfers は 0、1、2、または空欄です`,
+        entity: { type: "fare_attributes", id, field: "transfers" },
+      });
+    }
+  }
+}
+
+function checkGtfsJpAttributions(feed: Feed, issues: ValidationIssue[]) {
+  for (const row of getRows(feed, "attributions")) {
+    const hasRole = ["is_producer", "is_operator", "is_authority"].some(
+      (key) => (row[key] ?? "").trim() === "1",
+    );
+    if (hasRole) continue;
+    issues.push({
+      severity: "error",
+      code: "missing_attribution_role",
+      message: "attributions.txt は is_producer / is_operator / is_authority のいずれかで役割を指定してください",
+      entity: { type: "attributions", id: (row["attribution_id"] ?? row["organization_name"] ?? "").trim() },
+    });
+  }
+}
+
+function checkGtfsJpTransfers(feed: Feed, issues: ValidationIssue[]) {
+  for (const row of getRows(feed, "transfers")) {
+    const stopPair =
+      (row["from_stop_id"] ?? "").trim() !== "" && (row["to_stop_id"] ?? "").trim() !== "";
+    const tripPair =
+      (row["from_trip_id"] ?? "").trim() !== "" && (row["to_trip_id"] ?? "").trim() !== "";
+    if (!stopPair && !tripPair) {
+      issues.push({
+        severity: "error",
+        code: "missing_transfer_endpoint",
+        message: "transfers.txt は from/to の stop または trip の組を指定してください",
+        entity: { type: "transfers", id: (row["from_stop_id"] ?? row["from_trip_id"] ?? "").trim() },
+      });
+    }
+    const type = (row["transfer_type"] ?? "").trim();
+    if (type !== "" && !["0", "1", "2", "3", "4", "5"].includes(type)) {
+      issues.push({
+        severity: "error",
+        code: "invalid_transfer_type",
+        message: `transfers.txt の transfer_type が不正です: "${type}"`,
+        entity: { type: "transfers", field: "transfer_type", value: type },
+      });
+    }
   }
 }
 
@@ -571,6 +753,132 @@ function checkFeedInfoDates(feed: Feed, issues: ValidationIssue[]) {
       });
     }
   }
+}
+
+const GOOGLE_EXPIRY_SOON_DAYS = 30;
+
+function checkGoogleTransitReady(
+  feed: Feed,
+  issues: ValidationIssue[],
+  options: ValidateOptions,
+) {
+  checkGoogleShapes(feed, issues);
+  checkGoogleTripHeadsigns(feed, issues);
+  checkGoogleFeedExpiry(feed, issues, options.validationDate ?? todayLikeDate());
+  checkGoogleContact(feed, issues);
+  if (options.previousFeed) checkStablePublicIds(options.previousFeed, feed, issues);
+}
+
+function checkGoogleShapes(feed: Feed, issues: ValidationIssue[]) {
+  const hasBusRoute = getRows(feed, "routes").some((row) => (row["route_type"] ?? "").trim() === "3");
+  const hasShapes = (feed.tables.get("shapes")?.rows.length ?? 0) > 0;
+  if (!hasBusRoute || hasShapes) return;
+  issues.push({
+    severity: "warning",
+    code: "missing_shape_recommended",
+    message: "Google申請向けにはバス路線の shapes.txt 設定を推奨します",
+    entity: { type: "file", id: "shapes" },
+  });
+}
+
+function checkGoogleTripHeadsigns(feed: Feed, issues: ValidationIssue[]) {
+  const missing = getRows(feed, "trips").filter((row) => (row["trip_headsign"] ?? "").trim() === "");
+  if (missing.length === 0) return;
+  issues.push({
+    severity: "warning",
+    code: "missing_trip_headsign",
+    message: `trip_headsign がない便が ${missing.length} 件あります`,
+    entity: { type: "trips", count: missing.length, sample: missing.slice(0, 5).map((r) => r["trip_id"]) },
+  });
+}
+
+function checkGoogleFeedExpiry(feed: Feed, issues: ValidationIssue[], validationDate: string) {
+  if (!isValidGtfsDate(validationDate)) return;
+  const end = effectiveFeedEndDate(feed);
+  if (!end) return;
+  if (end < validationDate) {
+    issues.push({
+      severity: "error",
+      code: "feed_expired",
+      message: `サービス期間が終了しています（最終日: ${end}）`,
+      entity: { type: "feed", field: "feed_end_date", value: end },
+    });
+    return;
+  }
+  if (end <= addDays(validationDate, GOOGLE_EXPIRY_SOON_DAYS)) {
+    issues.push({
+      severity: "warning",
+      code: "feed_expired_soon",
+      message: `サービス期間の終了が近いです（最終日: ${end}）`,
+      entity: { type: "feed", field: "feed_end_date", value: end },
+    });
+  }
+}
+
+function effectiveFeedEndDate(feed: Feed): string | undefined {
+  const dates: string[] = [];
+  for (const row of getRows(feed, "feed_info")) {
+    const v = (row["feed_end_date"] ?? "").trim();
+    if (isValidGtfsDate(v)) dates.push(v);
+  }
+  for (const row of getRows(feed, "calendar")) {
+    const v = (row["end_date"] ?? "").trim();
+    if (isValidGtfsDate(v)) dates.push(v);
+  }
+  return dates.length > 0 ? dates.sort()[0] : undefined;
+}
+
+function checkGoogleContact(feed: Feed, issues: ValidationIssue[]) {
+  const hasAgencyContact = getRows(feed, "agency").some(
+    (row) =>
+      (row["agency_phone"] ?? "").trim() !== "" ||
+      (row["agency_email"] ?? "").trim() !== "" ||
+      (row["agency_fare_url"] ?? "").trim() !== "",
+  );
+  const hasFeedContact = getRows(feed, "feed_info").some(
+    (row) =>
+      (row["feed_contact_email"] ?? "").trim() !== "" ||
+      (row["feed_contact_url"] ?? "").trim() !== "",
+  );
+  if (hasAgencyContact || hasFeedContact) return;
+  issues.push({
+    severity: "warning",
+    code: "missing_contact",
+    message: "Google申請向けには agency または feed_info に問い合わせ先を設定してください",
+    entity: { type: "feed_info" },
+  });
+}
+
+function checkStablePublicIds(previous: Feed, current: Feed, issues: ValidationIssue[]) {
+  for (const { table, key } of [
+    { table: "agency", key: "agency_id" },
+    { table: "routes", key: "route_id" },
+    { table: "stops", key: "stop_id" },
+  ]) {
+    const before = idSet(previous, table, key);
+    const after = idSet(current, table, key);
+    if (before.size < 5 || after.size === 0) continue;
+    let retained = 0;
+    for (const id of after) if (before.has(id)) retained++;
+    const retainedRatio = retained / after.size;
+    if (retainedRatio >= 0.8) continue;
+    issues.push({
+      severity: "warning",
+      code: "unstable_public_ids",
+      message: `${table}.txt の公開ID継続率が低いです（${retained}/${after.size}件）。利用者アプリ側の履歴追跡に影響します`,
+      entity: { type: table, field: key, retained, current: after.size },
+    });
+  }
+}
+
+function addDays(date: string, days: number): string {
+  const d = new Date(Date.UTC(Number(date.slice(0, 4)), Number(date.slice(4, 6)) - 1, Number(date.slice(6, 8))));
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10).replace(/-/g, "");
+}
+
+function todayLikeDate(): string {
+  return new Date().toISOString().slice(0, 10).replace(/-/g, "");
 }
 
 // --- helpers --------------------------------------------------------------
