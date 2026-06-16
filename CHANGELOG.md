@@ -3,6 +3,30 @@
 GTFS Studio（西沢ツールWEB版）の段階的実装の記録。仕様書（`docs/spec/`）に追従し、
 `packages/core` の取込・検証・移行・出力を一歩ずつ確実にしていく。
 
+## Unreleased — 標準バリデータ連携・実データ検収（10.7 / 10.9 / 11章）
+
+公開前検証の最終段（標準GTFSバリデータ）と、最終OK判定（検収）の機械判定器を
+コアに追加した。validator の実行（Java実体起動）は別レイヤとし、コアは結果取込と
+判定に責務を絞る。
+
+### 追加
+
+- **標準validatorレポート取込**（`packages/core/src/standard-validator.ts`）。
+  MobilityData Canonical GTFS Schedule Validator の `report.json`（`notices[]` /
+  `summary.validatorVersion`）を `parseStandardValidatorReport` で取り込み、
+  severity 別に error/warning/info を集計する。`toStandardValidatorSummary` で
+  release-gate へ、`validatorLockFromResult` で `VALIDATOR_LOCK`（11.2）を生成する。
+- **実データ検収の判定器**（`packages/core/src/acceptance.ts`、`evaluateAcceptance`）。
+  仕様 11.1 の A-01〜A-10 を機械判定し、11.5 のJSON形（`status` / `checks` /
+  `specLocks`）で返す。標準検証・実フィード回帰・v3移行回帰・公開URL検証の証跡を
+  入力とし、すべて pass のときのみ `ready`。
+
+### テスト
+
+- `test/standard-validator.test.ts`（5件）、`test/acceptance.test.ts`（4件）を追加。
+  SAMPLE を v4 移行した golden feed が、清浄な validator 結果と証跡の下で
+  検収 `ready` になることを確認。コア全体で 59 → 68 件。
+
 ## Unreleased — GTFS-RT対応ロードマップ・達成管理
 
 GTFS-RT対応をフェーズ2として進められるよう、ロードマップ、課題、達成管理表を整備した。

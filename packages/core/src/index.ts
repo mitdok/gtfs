@@ -11,6 +11,8 @@ export * from "./importer.js";
 export * from "./migration.js";
 export * from "./validator.js";
 export * from "./spec-lock.js";
+export * from "./standard-validator.js";
 export * from "./release-gate.js";
+export * from "./acceptance.js";
 export * from "./export-profile.js";
 export * from "./exporter.js";

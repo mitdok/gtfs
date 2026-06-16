@@ -5,7 +5,7 @@
 
 - 最終更新: 2026-06-16
 - 対象コミット: 本ファイルと同一リビジョン
-- コア・テスト: 59 件 pass（`pnpm --filter @gtfs-studio/core test`）
+- コア・テスト: 68 件 pass（`pnpm --filter @gtfs-studio/core test`）
 
 ## 1. パイプライン全体
 
@@ -65,22 +65,28 @@
 
 ### ⏳ 未実装（残タスク）
 
-標準バリデータ連携、仕様ロック保存、実データ検収、プロファイル定義のJSON外部化。
+仕様ロック保存API、プロファイル定義のJSON外部化、公開ゲートのWeb表示。
 
-## 5. 仕様ロック・標準バリデータ連携（仕様 10.2 / 10.7 / 10.10）
+## 5. 仕様ロック・標準バリデータ連携・検収（仕様 10.2 / 10.7 / 10.9 / 10.10 / 11章）
 
-| 項目 | 状態 |
-|------|------|
-| 仕様ロック（`GTFS_JP_V4_LOCK` 等）の保存・API公開 | ⏳ 未実装 |
-| core内の仕様ロック定義・公開可否判定 | ✅ MVP |
-| MobilityData Canonical Validator 連携（10.7 step3） | ⏳ 未実装 |
-| プロファイル定義の外部データ化（10.11） | ⏳ 未実装 |
+| 項目 | 状態 | 主担当 |
+|------|------|--------|
+| core内の仕様ロック定義・公開可否判定 | ✅ MVP | `src/spec-lock.ts`, `src/release-gate.ts` |
+| MobilityData Validator レポート取込（10.7 step3） | ✅ `report.json` 取込・集計 | `src/standard-validator.ts` |
+| validator結果からの `VALIDATOR_LOCK` 生成（11.2） | ✅ | `src/standard-validator.ts` |
+| 実データ検収 A-01〜A-10（11.1/11.5） | ✅ 判定器 | `src/acceptance.ts` |
+| 仕様ロックの永続化・API公開 | ⏳ 未実装（api層） | — |
+| validator実体（Java）の起動 | ⏳ 別レイヤ（CLI/API） | — |
+| プロファイル定義の外部データ化（10.11） | ⏳ 未実装 | — |
+
+> validator の実行（Java実体の起動）はフレームワーク非依存のコアでは行わず、
+> 別レイヤが生成した `report.json` を `parseStandardValidatorReport` で取り込む。
 
 ## 6. 次の優先タスク（CHANGELOG「次の候補」と同期）
 
-1. **標準バリデータ連携**（10.7）と**実データ検収**（10.9 / 11章）。
+1. ~~標準バリデータ連携（10.7）と実データ検収（10.9 / 11章）~~ … ✅ 完了（`standard-validator.ts` / `acceptance.ts`）。
 2. **プロファイル定義の JSON 外部化**（10.11）と**仕様ロック保存API**（10.2）。
-3. **公開ゲートのWeb表示**：`evaluateReleaseGate` の blocker をUIで確認できるようにする。
+3. **公開ゲートのWeb表示**：`evaluateReleaseGate` / `evaluateAcceptance` の blocker をUIで確認できるようにする。
 
 ## 7. GTFS-RT対応
 
