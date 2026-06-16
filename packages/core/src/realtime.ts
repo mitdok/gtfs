@@ -8,6 +8,9 @@
 import gtfsRealtimeBindings from "gtfs-realtime-bindings";
 import type { transit_realtime } from "gtfs-realtime-bindings";
 
+// RT-2 外部中継・正規化を同じ `@gtfs-studio/core/realtime` サブパスで公開する。
+export * from "./realtime-relay.js";
+
 const { transit_realtime: rt } = gtfsRealtimeBindings;
 
 export type RealtimeAlertCause = keyof typeof rt.Alert.Cause;

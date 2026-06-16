@@ -16,7 +16,9 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const { openSpecLockRepository, createApiServer } = await import(resolve(here, "../dist/index.js"));
+const { openSpecLockRepository, createApiServer, createRtRelayService } = await import(
+  resolve(here, "../dist/index.js")
+);
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(`--${name}`);
@@ -30,9 +32,11 @@ const locksPath = resolve(
 );
 
 const repository = openSpecLockRepository(locksPath);
-const server = createApiServer({ repository });
+const rtRelay = createRtRelayService(); // 既定の global fetch を使用
+const server = createApiServer({ repository, rtRelay });
 
 server.listen(port, () => {
   console.error(`gtfs-studio API listening on http://localhost:${port}`);
   console.error(`spec-locks: ${locksPath}`);
+  console.error(`GTFS-RT relay: /rt/sources, POST /rt/sources/:id/poll, GET /rt/sources/:id/feed.pb`);
 });

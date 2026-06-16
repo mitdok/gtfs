@@ -28,7 +28,7 @@
 |----------|------|--------|------|
 | RT-0 | 調査・設計固定 | 本ロードマップ、仕様07章更新、受入基準 | ✅ 着手 |
 | RT-1 | ServiceAlerts最小実装 | 手動Alert入力モデル、protobuf生成、HTTP配信 | ⏳ core store＋Web pb出力完了 |
-| RT-2 | 外部GTFS-RT中継 | 既存 `.pb` の取得、検証、キャッシュ、再配信 | ⏳ 未着手 |
+| RT-2 | 外部GTFS-RT中継 | 既存 `.pb` の取得、検証、キャッシュ、再配信 | ✅ core relay＋api poller/配信完了 |
 | RT-3 | VehiclePositions取込 | GPS/外部JSON入力、車両位置Feed生成 | ⏳ 未着手 |
 | RT-4 | TripUpdates生成 | 静的GTFSとの突合、遅延算出、StopTimeUpdate生成 | ⏳ 未着手 |
 | RT-5 | 運用品質 | 監視、鮮度SLO、公開URL検証、Google申請前チェック | ⏳ 未着手 |
@@ -50,11 +50,11 @@
 
 | ID | タスク | 受入基準 | 状態 |
 |----|--------|----------|------|
-| RT-2-1 | `rt_sources` 設定モデル | endpoint/auth/poll_interval/feed_typeを保存できる | ⏳ |
-| RT-2-2 | poller設計 | `.pb` を取得し、Last-Modified/ETag/timeoutを扱う | ⏳ |
-| RT-2-3 | decode/validate | FeedHeader、entity、参照IDの最低限検証ができる | ⏳ |
-| RT-2-4 | cache/再配信 | 最新成功Feedを配信し、取得失敗時は stale 判定を返す | ⏳ |
-| RT-2-5 | 中継メトリクス | 最終取得時刻、age、decode error、HTTP errorを記録 | ⏳ |
+| RT-2-1 | `rt_sources` 設定モデル | endpoint/auth/poll_interval/feed_typeを保存できる | ✅ `RtSource`（`realtime-relay.ts`）／`PUT /rt/sources/:id` |
+| RT-2-2 | poller設計 | `.pb` を取得し、Last-Modified/ETag/timeoutを扱う | ✅ `createRtRelayService`（条件付きGET・AbortControllerでtimeout） |
+| RT-2-3 | decode/validate | FeedHeader、entity、参照IDの最低限検証ができる | ✅ `validateRealtimeFeed`（version/timestamp/座標/参照ID抽出） |
+| RT-2-4 | cache/再配信 | 最新成功Feedを配信し、取得失敗時は stale 判定を返す | ✅ `RtRelayStore.serve`／`GET /rt/sources/:id/feed.pb`（鮮度SLO） |
+| RT-2-5 | 中継メトリクス | 最終取得時刻、age、decode error、HTTP errorを記録 | ✅ `RtRelayMetrics`／`GET /rt/sources/:id/status` |
 
 ### RT-3 VehiclePositions
 

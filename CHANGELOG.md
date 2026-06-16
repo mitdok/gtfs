@@ -3,6 +3,40 @@
 GTFS Studio（西沢ツールWEB版）の段階的実装の記録。仕様書（`docs/spec/`）に追従し、
 `packages/core` の取込・検証・移行・出力を一歩ずつ確実にしていく。
 
+## Unreleased — GTFS-RT 外部中継・正規化（RT-2）
+
+外部の GTFS-RT `.pb` を取得・検証・正規化してキャッシュし、最新成功Feedを再配信する
+中継機能を追加した（GTFS_RT_ROADMAP の RT-2）。trip_updates / vehicle_positions /
+service_alerts を対象に、鮮度SLOと中継メトリクスを持つ。
+
+### 追加（core）
+
+- **`realtime-relay.ts`**（`@gtfs-studio/core/realtime` サブパスで公開）。
+  - `validateRealtimeFeed`: `.pb` を decode し、FeedHeader版/timestamp・vehicle座標を検証、
+    種別件数と参照ID（trip/route/stop）を抽出して正規化する。
+  - `createRtRelayStore`: source 設定（`RtSource`）、最新成功Feedのキャッシュ、
+    `serve`（鮮度SLO=TripUpdates/VehiclePositions 90秒・Alerts 600秒で stale 判定）、
+    中継メトリクス（取得時刻・連続失敗・decode/HTTP error）を保持。ネットワーク非依存。
+
+### 追加（api）
+
+- **`rt-relay.ts`**（`createRtRelayService`）。`fetch` 注入可能な poller。条件付きGET
+  （ETag / Last-Modified）、`AbortController` による timeout、304/HTTPエラー/decodeエラーの
+  分類を行う。
+- **中継エンドポイント**（`server.ts`）。
+  - `GET /rt/sources` ／ `GET|PUT|DELETE /rt/sources/:id`
+  - `POST /rt/sources/:id/poll`（取得・取り込み）
+  - `GET /rt/sources/:id/status`（メトリクス・鮮度・正規化サマリ）
+  - `GET /rt/sources/:id/feed.pb`（`application/x-protobuf` 再配信、`X-Feed-Stale` / `X-Feed-Age-Sec`）
+- `bin/gtfs-api.mjs` が既定で global fetch の中継サービスを起動。
+
+### テスト
+
+- core `test/realtime-relay.test.ts`（6件）、api `test/rt-relay.test.ts`（6件）を追加。
+  正規化・鮮度・メトリクス・poller（注入fetchで200/304/エラー）・各エンドポイントを確認。
+  実バイナリ経由（bin＋global fetch）で poll→ingested→`feed.pb` 配信も実機確認。
+  コア 87→93、API 10→16 件。
+
 ## Unreleased — バックエンドAPI: 仕様ロック永続化・検収HTTP（10.2 / 11.4）
 
 仕様ロックの永続化と検収実行を HTTP で提供する `@gtfs-studio/api` を新設した。
