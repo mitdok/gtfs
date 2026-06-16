@@ -11,8 +11,11 @@ import { TimetableView } from "./components/TimetableView";
 import { ValidationView } from "./components/ValidationView";
 import { ReleaseGateView } from "./components/ReleaseGateView";
 import { RealtimeAlertsView } from "./components/RealtimeAlertsView";
+import { NewFeedView } from "./components/NewFeedView";
 
-type Tab = "stops" | "timetable" | "validation" | "release" | "rt-alerts";
+/** トップで選ぶ作業モード。`edit` は feed 取込/作成後の編集画面。 */
+type View = "home" | "import" | "new" | "rt" | "edit";
+type EditTab = "stops" | "timetable" | "validation" | "release";
 type ProfileId = "gtfs-jp-v4" | "google-transit-ready" | "gtfs-base" | "gtfs-jp-v3-legacy";
 
 const PROFILE_OPTIONS: { id: ProfileId; label: string }[] = [
@@ -22,12 +25,19 @@ const PROFILE_OPTIONS: { id: ProfileId; label: string }[] = [
   { id: "gtfs-jp-v3-legacy", label: "v3互換" },
 ];
 
+const HOME_CARDS: { id: View; icon: string; title: string; desc: string }[] = [
+  { id: "import", icon: "📦", title: "ZIPインポート", desc: "既存のGTFS zipを読み込んで停留所・ダイヤ・検証・公開ゲートを編集する。" },
+  { id: "new", icon: "✏️", title: "新規作成", desc: "事業者・路線・停留所からゼロでGTFS-JP v4フィードを作成する。" },
+  { id: "rt", icon: "📡", title: "GTFS-RT", desc: "運行情報（ServiceAlerts）を手動登録し、protobufを生成・配信する。" },
+];
+
 export function App() {
   const feedRef = useRef<Feed | null>(null);
   const [version, setVersion] = useState(0); // フィード変更の再描画トリガ
   const [report, setReport] = useState<ValidationReport | null>(null);
   const [fileName, setFileName] = useState<string>("");
-  const [tab, setTab] = useState<Tab>("stops");
+  const [view, setView] = useState<View>("home");
+  const [editTab, setEditTab] = useState<EditTab>("stops");
   const [profileId, setProfileId] = useState<ProfileId>("gtfs-jp-v4");
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
 
@@ -50,17 +60,31 @@ export function App() {
     [revalidate],
   );
 
+  const enterEditor = useCallback(
+    (feed: Feed, name: string, warnings: string[]) => {
+      feedRef.current = feed;
+      setFileName(name);
+      setImportWarnings(warnings);
+      setVersion((v) => v + 1);
+      revalidate(feed);
+      setEditTab("stops");
+      setView("edit");
+    },
+    [revalidate],
+  );
+
   const onFile = useCallback(
     async (file: File) => {
       const bytes = new Uint8Array(await file.arrayBuffer());
       const { feed, warnings } = importGtfsZip(bytes);
-      feedRef.current = feed;
-      setFileName(file.name);
-      setImportWarnings(warnings);
-      setVersion((v) => v + 1);
-      revalidate(feed);
+      enterEditor(feed, file.name, warnings);
     },
-    [revalidate],
+    [enterEditor],
+  );
+
+  const onCreateFeed = useCallback(
+    (feed: Feed, name: string) => enterEditor(feed, name, []),
+    [enterEditor],
   );
 
   const onDownload = useCallback(() => {
@@ -94,49 +118,44 @@ export function App() {
     return { cls: "badge ok", text: "検証OK" };
   }, [summary]);
 
+  const inEditor = view === "edit" && !!feed;
+
   return (
     <div className="app">
       <header className="header">
-        <h1>GTFS Studio</h1>
-        <label className="file-btn">
-          GTFS zip を開く
-          <input
-            type="file"
-            accept=".zip"
-            style={{ display: "none" }}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void onFile(f);
-              e.target.value = "";
-            }}
-          />
-        </label>
-        {fileName && <span className="filename">{fileName}</span>}
-        {badge && (
-          <button className={badge.cls} onClick={() => setTab("validation")}>
-            {badge.text}
+        <h1 className="brand" onClick={() => setView("home")}>GTFS Studio</h1>
+        {view !== "home" && (
+          <button className="home-btn" onClick={() => setView("home")}>
+            ← トップ
           </button>
         )}
         <div className="spacer" />
-        <label className="profile-select">
-          <span>検証</span>
-          <select
-            value={profileId}
-            onChange={(e) => onProfileChange(e.target.value as ProfileId)}
-          >
-            {PROFILE_OPTIONS.map((profile) => (
-              <option key={profile.id} value={profile.id}>
-                {profile.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button className="primary" disabled={!feed} onClick={onDownload}>
-          gtfs.zip を出力
-        </button>
+        {inEditor && (
+          <>
+            {fileName && <span className="filename">{fileName}</span>}
+            {badge && (
+              <button className={badge.cls} onClick={() => setEditTab("validation")}>
+                {badge.text}
+              </button>
+            )}
+            <label className="profile-select">
+              <span>検証</span>
+              <select value={profileId} onChange={(e) => onProfileChange(e.target.value as ProfileId)}>
+                {PROFILE_OPTIONS.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button className="primary" onClick={onDownload}>
+              gtfs.zip を出力
+            </button>
+          </>
+        )}
       </header>
 
-      {importWarnings.length > 0 && (
+      {inEditor && importWarnings.length > 0 && (
         <div className="import-warnings">
           {importWarnings.map((w, i) => (
             <div key={i}>取込警告: {w}</div>
@@ -144,51 +163,97 @@ export function App() {
         </div>
       )}
 
-      <nav className="tabs">
-        <button className={tab === "stops" ? "active" : ""} onClick={() => setTab("stops")}>
-          停留所
-        </button>
-        <button className={tab === "timetable" ? "active" : ""} onClick={() => setTab("timetable")}>
-          ダイヤ
-        </button>
-        <button className={tab === "validation" ? "active" : ""} onClick={() => setTab("validation")}>
-          検証 {summary ? `(${summary.errors + summary.warnings})` : ""}
-        </button>
-        <button className={tab === "release" ? "active" : ""} onClick={() => setTab("release")}>
-          公開ゲート
-        </button>
-        <button className={tab === "rt-alerts" ? "active" : ""} onClick={() => setTab("rt-alerts")}>
-          RT Alert
-        </button>
-      </nav>
-
-      {!feed && tab !== "rt-alerts" ? (
-        <div className="empty">
-          <p>GTFS（GTFS-JP）の zip ファイルを開いてください。</p>
-          <p className="hint">
-            例: 豊鉄バスの公開GTFSデータなど。取込後、停留所の地図編集・ダイヤ表の閲覧編集・検証が行えます。
-          </p>
-        </div>
-      ) : (
-        <main className="main">
-          {tab === "stops" && feed && (
-            <StopsView feed={feed} version={version} mutateFeed={mutateFeed} />
-          )}
-          {tab === "timetable" &&
-            (feed ? (
-              <TimetableView feed={feed} version={version} mutateFeed={mutateFeed} />
-            ) : (
-              <div className="empty">GTFS zip を開いてください。</div>
-            ))}
-          {tab === "validation" && <ValidationView report={report} profileId={profileId} />}
-          {tab === "release" &&
-            (feed ? (
-              <ReleaseGateView feed={feed} profileId={profileId} />
-            ) : (
-              <div className="empty">GTFS zip を開いてください。</div>
-            ))}
-          {tab === "rt-alerts" && <RealtimeAlertsView />}
+      {view === "home" && (
+        <main className="home-view">
+          <div className="home-inner">
+            <h2 className="home-title">どの作業を始めますか？</h2>
+            <p className="home-sub">GTFS-JP v4 / GTFS-RT の公開データを、取込・作成・検証・配信します。</p>
+            <div className="home-grid">
+              {HOME_CARDS.map((card) => (
+                <button key={card.id} className="home-card" onClick={() => setView(card.id)}>
+                  <span className="home-card-icon">{card.icon}</span>
+                  <span className="home-card-title">{card.title}</span>
+                  <span className="home-card-desc">{card.desc}</span>
+                </button>
+              ))}
+              {feed && (
+                <button className="home-card resume" onClick={() => setView("edit")}>
+                  <span className="home-card-icon">↩️</span>
+                  <span className="home-card-title">編集に戻る</span>
+                  <span className="home-card-desc">{fileName || "読み込み済みのフィード"} の編集を再開する。</span>
+                </button>
+              )}
+            </div>
+          </div>
         </main>
+      )}
+
+      {view === "import" && (
+        <main className="main">
+          <div className="import-feed-view">
+            <section className="source-panel">
+              <h2>ZIPインポート</h2>
+              <p>既存のGTFS zip（GTFS-JP含む）を読み込みます。Shift_JISも自動判定で取り込みます。</p>
+              <label className="file-btn large">
+                GTFS zip を選択
+                <input
+                  type="file"
+                  accept=".zip"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void onFile(f);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {feed && (
+                <button type="button" onClick={() => setView("edit")}>
+                  読み込み済みデータを編集
+                </button>
+              )}
+            </section>
+          </div>
+        </main>
+      )}
+
+      {view === "new" && (
+        <main className="main">
+          <NewFeedView onCreate={onCreateFeed} />
+        </main>
+      )}
+
+      {view === "rt" && (
+        <main className="main">
+          <RealtimeAlertsView />
+        </main>
+      )}
+
+      {inEditor && (
+        <>
+          <nav className="tabs">
+            <button className={editTab === "stops" ? "active" : ""} onClick={() => setEditTab("stops")}>
+              停留所
+            </button>
+            <button className={editTab === "timetable" ? "active" : ""} onClick={() => setEditTab("timetable")}>
+              ダイヤ
+            </button>
+            <button className={editTab === "validation" ? "active" : ""} onClick={() => setEditTab("validation")}>
+              検証 {summary ? `(${summary.errors + summary.warnings})` : ""}
+            </button>
+            <button className={editTab === "release" ? "active" : ""} onClick={() => setEditTab("release")}>
+              公開ゲート
+            </button>
+          </nav>
+          <main className="main">
+            {editTab === "stops" && <StopsView feed={feed} version={version} mutateFeed={mutateFeed} />}
+            {editTab === "timetable" && (
+              <TimetableView feed={feed} version={version} mutateFeed={mutateFeed} />
+            )}
+            {editTab === "validation" && <ValidationView report={report} profileId={profileId} />}
+            {editTab === "release" && <ReleaseGateView feed={feed} profileId={profileId} />}
+          </main>
+        </>
       )}
     </div>
   );
