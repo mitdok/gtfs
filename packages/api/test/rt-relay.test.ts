@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
-import { encodeServiceAlertsFeed } from "@gtfs-studio/core/realtime";
+import { createRealtimeAlertStore, decodeRealtimeFeed, encodeServiceAlertsFeed } from "@gtfs-studio/core/realtime";
 import { openSpecLockRepository } from "../src/spec-lock-repository.js";
 import { createRtRelayService, type RtFetch, type RtFetchResponse } from "../src/rt-relay.js";
 import { createApiServer } from "../src/server.js";
@@ -157,5 +157,75 @@ describe("RT-2 中継エンドポイント", () => {
     const r = await fetch(`${b}/rt/sources`);
     expect(r.status).toBe(501);
     await new Promise<void>((res) => s.close(() => res()));
+  });
+});
+
+describe("RT-1 手動ServiceAlerts API", () => {
+  let server: Server;
+  let base: string;
+
+  beforeEach(async () => {
+    const repository = openSpecLockRepository("/tmp/__rt_alert_locks_unused.json");
+    server = createApiServer({
+      repository,
+      rtAlerts: createRealtimeAlertStore(),
+      rtNow: () => 1_781_568_000,
+    });
+    base = await new Promise((resolve) => {
+      server.listen(0, "127.0.0.1", () => {
+        const { port } = server.address() as AddressInfo;
+        resolve(`http://127.0.0.1:${port}`);
+      });
+    });
+  });
+  afterEach(async () => {
+    await new Promise<void>((r) => server.close(() => r()));
+  });
+
+  it("Alertを登録・取得・protobuf配信できる", async () => {
+    const post = await fetch(`${base}/rt/alerts`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        id: "manual-1",
+        informedEntities: [{ routeId: "R1" }],
+        effect: "NO_SERVICE",
+        headerText: { ja: "運休" },
+      }),
+    });
+    expect(post.status).toBe(200);
+    expect((await post.json()).enabled).toBe(true);
+
+    const list = await fetch(`${base}/rt/alerts`);
+    expect((await list.json()).alerts.map((a: { id: string }) => a.id)).toEqual(["manual-1"]);
+
+    const pb = await fetch(`${base}/rt/alerts.pb`);
+    expect(pb.status).toBe(200);
+    expect(pb.headers.get("content-type")).toContain("x-protobuf");
+    const feed = decodeRealtimeFeed(new Uint8Array(await pb.arrayBuffer()));
+    expect(feed.entity[0]?.id).toBe("manual-1");
+    expect(feed.entity[0]?.alert?.informedEntity[0]?.routeId).toBe("R1");
+  });
+
+  it("PUT/DELETEでAlertを更新・削除できる", async () => {
+    const put = await fetch(`${base}/rt/alerts/manual-2`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        informedEntities: [{ stopId: "S1" }],
+        effect: "DETOUR",
+        headerText: { ja: "迂回" },
+        enabled: false,
+      }),
+    });
+    expect(put.status).toBe(200);
+    expect((await put.json()).id).toBe("manual-2");
+
+    const get = await fetch(`${base}/rt/alerts/manual-2`);
+    expect((await get.json()).enabled).toBe(false);
+
+    const del = await fetch(`${base}/rt/alerts/manual-2`, { method: "DELETE" });
+    expect((await del.json()).removed).toBe(true);
+    expect((await fetch(`${base}/rt/alerts/manual-2`)).status).toBe(404);
   });
 });

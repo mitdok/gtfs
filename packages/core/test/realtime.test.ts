@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   buildServiceAlertsFeed,
+  buildVehiclePositionsFeed,
   createRealtimeAlertStore,
   decodeRealtimeFeed,
   encodeServiceAlertsFeed,
+  encodeVehiclePositionsFeed,
   realtimeFeedToObject,
 } from "../src/realtime.js";
 
@@ -136,5 +138,53 @@ describe("GTFS-RT ServiceAlerts", () => {
       }),
     ).toThrow(/informed entity/);
     expect(store.list()).toHaveLength(0);
+  });
+});
+
+describe("GTFS-RT VehiclePositions", () => {
+  it("車両位置入力からFeedMessage protobufを生成してdecodeできる", () => {
+    const bytes = encodeVehiclePositionsFeed(
+      [
+        {
+          id: "veh-entity-1",
+          vehicleId: "bus-101",
+          label: "101号車",
+          latitude: 34.7691,
+          longitude: 137.3916,
+          bearing: 120,
+          speed: 8.5,
+          timestamp: "2026-06-16T00:00:45Z",
+          tripId: "T1",
+          routeId: "R1",
+        },
+      ],
+      { timestamp: "2026-06-16T00:01:00Z", feedVersion: "vp-test-1" },
+    );
+
+    const feed = decodeRealtimeFeed(bytes);
+    expect(feed.header.gtfsRealtimeVersion).toBe("2.0");
+    expect(feed.header.feedVersion).toBe("vp-test-1");
+    expect(feed.entity[0]?.vehicle?.vehicle?.id).toBe("bus-101");
+    expect(feed.entity[0]?.vehicle?.trip?.tripId).toBe("T1");
+    expect(feed.entity[0]?.vehicle?.position?.latitude).toBeCloseTo(34.7691);
+    expect(Number(feed.entity[0]?.vehicle?.timestamp)).toBe(1781568045);
+  });
+
+  it("車両ID・座標・方位の不正値を拒否する", () => {
+    expect(() =>
+      buildVehiclePositionsFeed([
+        { id: "bad", vehicleId: "", latitude: 34.7, longitude: 137.3 },
+      ]),
+    ).toThrow(/vehicleId/);
+    expect(() =>
+      buildVehiclePositionsFeed([
+        { id: "bad", vehicleId: "v1", latitude: 0, longitude: 0 },
+      ]),
+    ).toThrow(/latitude\/longitude/);
+    expect(() =>
+      buildVehiclePositionsFeed([
+        { id: "bad", vehicleId: "v1", latitude: 34.7, longitude: 137.3, bearing: 361 },
+      ]),
+    ).toThrow(/bearing/);
   });
 });

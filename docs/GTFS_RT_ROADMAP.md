@@ -1,6 +1,6 @@
 # GTFS-RT対応ロードマップ・課題・達成管理
 
-最終更新: 2026-06-16
+最終更新: 2026-06-29
 
 本書はGTFS StudioにGTFS Realtime（GTFS-RT）を追加するための実装ロードマップ、課題、達成管理表である。静的GTFS-JP v4生成とは別フェーズとして扱い、まず手動Alertと外部GTFS-RT中継から始め、車両位置・遅延予測の自動生成へ段階的に進める。
 
@@ -27,9 +27,9 @@
 | フェーズ | 目的 | 成果物 | 状態 |
 |----------|------|--------|------|
 | RT-0 | 調査・設計固定 | 本ロードマップ、仕様07章更新、受入基準 | ✅ 着手 |
-| RT-1 | ServiceAlerts最小実装 | 手動Alert入力モデル、protobuf生成、HTTP配信 | ⏳ core store＋Web pb出力完了 |
+| RT-1 | ServiceAlerts最小実装 | 手動Alert入力モデル、protobuf生成、HTTP配信 | ✅ core store＋API pb配信完了 / Webはローカル保存 |
 | RT-2 | 外部GTFS-RT中継 | 既存 `.pb` の取得、検証、キャッシュ、再配信 | ✅ core relay＋api poller/配信完了 |
-| RT-3 | VehiclePositions取込 | GPS/外部JSON入力、車両位置Feed生成 | ⏳ 未着手 |
+| RT-3 | VehiclePositions取込 | GPS/外部JSON入力、車両位置Feed生成 | ⏳ core builder着手 |
 | RT-4 | TripUpdates生成 | 静的GTFSとの突合、遅延算出、StopTimeUpdate生成 | ⏳ 未着手 |
 | RT-5 | 運用品質 | 監視、鮮度SLO、公開URL検証、Google申請前チェック | ⏳ 未着手 |
 
@@ -45,6 +45,7 @@
 | RT-1-4 | `alerts.pb` 生成テスト | protobuf decode後にheader/entity/alertが期待通り | ✅ |
 | RT-1-5 | API設計更新 | `POST /projects/{p}/rt/alerts` と `GET /rt/.../alerts.pb` を仕様化 | ✅ |
 | RT-1-6 | Web入力画面の最小版 | 運休・遅延・停留所閉鎖Alertを手動登録できる | ⏳ ローカル保存＋pb生成UIまで完了 |
+| RT-1-7 | 手動Alert API保存・配信 | `POST/PUT/DELETE /rt/alerts` と `GET /rt/alerts.pb` で登録Alertを配信できる | ✅ |
 
 ### RT-2 外部GTFS-RT中継
 
@@ -62,8 +63,8 @@
 |----|--------|----------|------|
 | RT-3-1 | ingest API | 車両ID、緯度経度、timestamp、route/trip候補を受け取る | ⏳ |
 | RT-3-2 | 認証・レート制限 | source token単位で認証し、不正入力を拒否 | ⏳ |
-| RT-3-3 | 座標検証 | lat/lon範囲、timestamp鮮度、vehicle_id必須を検証 | ⏳ |
-| RT-3-4 | VehiclePosition生成 | vehicle/trip/position/timestampをprotobuf化 | ⏳ |
+| RT-3-3 | 座標検証 | lat/lon範囲、timestamp鮮度、vehicle_id必須を検証 | ✅ core MVP |
+| RT-3-4 | VehiclePosition生成 | vehicle/trip/position/timestampをprotobuf化 | ✅ core MVP |
 | RT-3-5 | 地図デバッグ表示 | Webで最新車両位置とageを確認できる | ⏳ |
 
 ### RT-4 TripUpdates
@@ -113,6 +114,7 @@
 
 1. ~~protobuf依存を選定し、`FeedMessage` のencode/decodeテストを作る。~~ ✅
 2. ~~ServiceAlertsのbuilderをcoreへ追加する。~~ ✅
-3. API側で手動Alert CRUDと `alerts.pb` HTTP配信を実装する。
+3. ~~API側で手動Alert CRUDと `alerts.pb` HTTP配信を実装する。~~ ✅
 4. WebのローカルAlert保存をAPI保存へ接続する。
-5. 外部GTFS-RT中継のsourceモデルとpoller設計へ進む。
+5. VehiclePositions ingest APIと最新位置ストアを追加する。
+6. 外部GTFS-RT中継のsourceモデルとpoller設計へ進む。 ✅ RT-2完了

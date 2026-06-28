@@ -3,10 +3,10 @@
 仕様書（[`docs/spec/`](./spec/README.md)）に対して、`packages/core` の実装が
 どこまで到達しているかを一覧化する。変更履歴の詳細は [`../CHANGELOG.md`](../CHANGELOG.md) を参照。
 
-- 最終更新: 2026-06-16
+- 最終更新: 2026-06-29
 - 対象コミット: 本ファイルと同一リビジョン
-- コア・テスト: 94 件 pass（`pnpm --filter @gtfs-studio/core test`）
-- API・テスト: 16 件 pass（`pnpm --filter @gtfs-studio/api test`）
+- コア・テスト: 97 件 pass（`pnpm --filter @gtfs-studio/core test`）
+- API・テスト: 18 件 pass（`pnpm --filter @gtfs-studio/api test`）
 
 ## 1. パイプライン全体
 
@@ -69,7 +69,7 @@
 | stop_times | `invalid_time_format`, `duplicate_stop_sequence`, `departure_before_arrival`, `stop_time_decreasing`（停車時間考慮） |
 | calendar | `invalid_date_format`, `calendar_end_before_start`, `invalid_calendar_day_flag`, `service_empty`, `invalid_exception_type` |
 | GTFS-JP | `legacy_jp_file`, `missing_stop_name_kana`, `invalid_fare_price`, `non_jpy_fare_currency` |
-| GTFS-JP v4 条件付き | `forbidden_v4_fixed_route_field`, `forbidden_v4_network_file`, `missing_trip_shape_id`, `invalid_shape_pt_lat`, `invalid_shape_pt_lon`, `duplicate_shape_pt_sequence`, `missing_translation_record_key`, `invalid_fare_payment_method`, `invalid_fare_transfers`, `missing_attribution_role`, `missing_transfer_endpoint`, `invalid_transfer_type` |
+| GTFS-JP v4 条件付き | `forbidden_v4_fixed_route_field`, `forbidden_v4_network_file`, `missing_trip_shape_id`, `invalid_shape_pt_lat`, `invalid_shape_pt_lon`, `duplicate_shape_pt_sequence`, `missing_translation_record_key`, `invalid_fare_payment_method`, `invalid_fare_transfers`, `invalid_parent_station`, `invalid_parent_station_type`, `missing_fare_zone`, `missing_attribution_role`, `missing_transfer_endpoint`, `invalid_transfer_type` |
 | 型・値形式 | `invalid_url`, `invalid_timezone`, `invalid_language`, `invalid_integer`, `invalid_latitude`, `invalid_longitude`, `invalid_enum`, `invalid_color` |
 | feed_info | `feed_info_date_range` |
 | Google公開ゲート | `missing_shape_recommended`, `missing_trip_headsign`, `feed_expired`, `feed_expired_soon`, `unstable_public_ids`, `missing_contact` |
@@ -117,9 +117,9 @@ GTFS-RTはフェーズ2以降の対象。ロードマップ、課題、達成管
 | フェーズ | 状態 | 内容 |
 |----------|------|------|
 | RT-0 | ✅ 着手 | 公式参照確認、ロードマップ・課題・達成管理表の整備 |
-| RT-1 | ⏳ core store＋Web pb出力完了 | ServiceAlerts手動投入＋protobuf配信（`src/realtime.ts`, `RealtimeAlertsView.tsx`） |
+| RT-1 | ✅ core store＋API pb配信完了 / Webはローカル保存 | ServiceAlerts手動投入＋protobuf配信（`src/realtime.ts`, `api/server.ts`, `RealtimeAlertsView.tsx`） |
 | RT-2 | ✅ core relay＋api poller/配信 | 外部GTFS-RT中継・正規化（`realtime-relay.ts`, `api/rt-relay.ts`） |
-| RT-3 | ⏳ 未着手 | VehiclePositions取込・配信 |
+| RT-3 | ⏳ core builder着手 | VehiclePositions protobuf生成（`src/realtime.ts`）。ingest API・地図表示は未実装 |
 | RT-4 | ⏳ 未着手 | TripUpdates生成・静的GTFS突合 |
 | RT-5 | ⏳ 未着手 | 鮮度SLO、監視、公開URL検証 |
 

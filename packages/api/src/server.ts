@@ -14,6 +14,7 @@ import {
   type SpecLockId,
 } from "@gtfs-studio/core";
 import type { RtSource } from "@gtfs-studio/core/realtime";
+import type { RealtimeAlertStore, ServiceAlertInput } from "@gtfs-studio/core/realtime";
 import type { SpecLockRepository } from "./spec-lock-repository.js";
 import type { RtRelayService } from "./rt-relay.js";
 
@@ -30,6 +31,8 @@ export interface ApiOptions {
   now?: () => string;
   /** GTFS-RT 外部中継サービス（未指定なら /rt 系は 501）。 */
   rtRelay?: RtRelayService;
+  /** 手動ServiceAlerts保存・配信用ストア（未指定なら /rt/alerts 系は 501）。 */
+  rtAlerts?: RealtimeAlertStore;
   /** `.pb` 再配信時の age 算定基準（Unix秒）。テスト用。既定は実時刻。 */
   rtNow?: () => number;
 }
@@ -165,11 +168,53 @@ export function createApiServer(options: ApiOptions): Server {
       });
     }
 
-    // ---- GTFS-RT 外部中継（RT-2） ----
+    // ---- GTFS-RT 手動ServiceAlerts（RT-1） / 外部中継（RT-2） ----
     if (path === "/rt/sources" || path.startsWith("/rt/")) {
+      const rtNow = options.rtNow ?? (() => Math.floor(Date.now() / 1000));
+
+      if (path === "/rt/alerts") {
+        const store = options.rtAlerts;
+        if (!store) return sendJson(res, 501, { error: "rt alerts are not configured" });
+        if (method === "GET") return sendJson(res, 200, { alerts: store.list() });
+        if (method === "POST") {
+          const body = (await readJsonBody(req)) as Partial<ServiceAlertInput & { enabled: boolean }>;
+          if (!body.id) return sendJson(res, 400, { error: "id is required" });
+          const stored = store.upsert(body as ServiceAlertInput & { enabled?: boolean }, rtNow());
+          return sendJson(res, 200, stored);
+        }
+        return sendJson(res, 405, { error: "method not allowed" });
+      }
+
+      if (path === "/rt/alerts.pb" && method === "GET") {
+        const store = options.rtAlerts;
+        if (!store) return sendJson(res, 501, { error: "rt alerts are not configured" });
+        return sendBytes(res, 200, store.encode({ timestamp: rtNow(), activeAt: rtNow() }), {
+          "cache-control": "no-cache",
+        });
+      }
+
+      const alertMatch = path.match(/^\/rt\/alerts\/([^/]+)$/);
+      if (alertMatch) {
+        const store = options.rtAlerts;
+        if (!store) return sendJson(res, 501, { error: "rt alerts are not configured" });
+        const id = decodeURIComponent(alertMatch[1]!);
+        if (method === "GET") {
+          const alert = store.get(id);
+          return alert ? sendJson(res, 200, alert) : sendJson(res, 404, { error: "not found" });
+        }
+        if (method === "PUT") {
+          const body = (await readJsonBody(req)) as Partial<ServiceAlertInput & { enabled: boolean }>;
+          const stored = store.upsert({ ...(body as ServiceAlertInput), id }, rtNow());
+          return sendJson(res, 200, stored);
+        }
+        if (method === "DELETE") {
+          return sendJson(res, 200, { removed: store.remove(id) });
+        }
+        return sendJson(res, 405, { error: "method not allowed" });
+      }
+
       const rt = options.rtRelay;
       if (!rt) return sendJson(res, 501, { error: "rt relay is not configured" });
-      const rtNow = options.rtNow ?? (() => Math.floor(Date.now() / 1000));
 
       if (path === "/rt/sources") {
         if (method === "GET") return sendJson(res, 200, { sources: rt.store.sources() });

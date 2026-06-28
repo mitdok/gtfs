@@ -384,6 +384,10 @@ function checkReferences(feed: Feed, issues: ValidationIssue[]) {
     if (fid !== "" && !fareIds.has(fid)) {
       issues.push(ref("fare_rules", "fare_id", row, "fare_id", fid, "fare_attributes"));
     }
+    const rid = (row["route_id"] ?? "").trim();
+    if (rid !== "" && !routeIds.has(rid)) {
+      issues.push(ref("fare_rules", "fare_id", row, "route_id", rid, "routes"));
+    }
   }
 }
 
@@ -618,6 +622,7 @@ function checkGtfsJpV4(feed: Feed, issues: ValidationIssue[]) {
   checkGtfsJpV4Shapes(feed, issues);
   checkGtfsJpTranslations(feed, issues);
   checkGtfsJpFareAttributes(feed, issues);
+  checkGtfsJpStopHierarchyAndFareZones(feed, issues);
   checkGtfsJpAttributions(feed, issues);
   checkGtfsJpTransfers(feed, issues);
   checkGtfsJpOptionalValueFormats(feed, issues);
@@ -811,6 +816,63 @@ function checkGtfsJpFareAttributes(feed: Feed, issues: ValidationIssue[]) {
         code: "invalid_fare_transfers",
         message: `fare_attributes.txt fare_id="${id}" の transfers は 0、1、2、または空欄です`,
         entity: { type: "fare_attributes", id, field: "transfers" },
+      });
+    }
+  }
+}
+
+function checkGtfsJpStopHierarchyAndFareZones(feed: Feed, issues: ValidationIssue[]) {
+  const stopRows = getRows(feed, "stops");
+  const locationTypeByStop = new Map(
+    stopRows.map((row) => [(row["stop_id"] ?? "").trim(), (row["location_type"] ?? "0").trim() || "0"]),
+  );
+  const zones = new Set(
+    stopRows.map((row) => (row["zone_id"] ?? "").trim()).filter((zone) => zone !== ""),
+  );
+
+  for (const row of stopRows) {
+    const id = (row["stop_id"] ?? "").trim();
+    const locationType = (row["location_type"] ?? "0").trim() || "0";
+    const parent = (row["parent_station"] ?? "").trim();
+    if (parent === "") continue;
+    if (parent === id) {
+      issues.push({
+        severity: "error",
+        code: "invalid_parent_station",
+        message: `stops.txt stop_id="${id}" は parent_station に自分自身を指定できません`,
+        entity: { type: "stops", id, field: "parent_station", value: parent },
+      });
+      continue;
+    }
+    const parentType = locationTypeByStop.get(parent);
+    if (parentType === undefined) continue; // dangling_reference 側で報告済み
+    if (locationType === "1") {
+      issues.push({
+        severity: "error",
+        code: "invalid_parent_station",
+        message: `stops.txt stop_id="${id}" は駅・ターミナル(location_type=1)のため parent_station を持てません`,
+        entity: { type: "stops", id, field: "parent_station", value: parent },
+      });
+    } else if (parentType !== "1") {
+      issues.push({
+        severity: "error",
+        code: "invalid_parent_station_type",
+        message: `stops.txt stop_id="${id}" の parent_station="${parent}" は location_type=1 の駅・ターミナルである必要があります`,
+        entity: { type: "stops", id, field: "parent_station", value: parent },
+      });
+    }
+  }
+
+  for (const row of getRows(feed, "fare_rules")) {
+    const fareId = (row["fare_id"] ?? "").trim();
+    for (const field of ["origin_id", "destination_id", "contains_id"] as const) {
+      const zone = (row[field] ?? "").trim();
+      if (zone === "" || zones.has(zone)) continue;
+      issues.push({
+        severity: "error",
+        code: "missing_fare_zone",
+        message: `fare_rules.txt fare_id="${fareId}" の ${field}="${zone}" が stops.zone_id に存在しません`,
+        entity: { type: "fare_rules", id: fareId, field, value: zone },
       });
     }
   }

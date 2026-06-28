@@ -1,12 +1,12 @@
 # GTFS-JP v4対応ロードマップ・達成管理
 
-最終更新: 2026-06-16
+最終更新: 2026-06-29
 
 本書はGTFS StudioのGTFS-JP v4対応を、実装・検証・公開運用の観点で段階管理する。対象は固定路線バスの静的GTFS-JP v4 MVPであり、GTFS-RT、GTFS-Flex、Fares v2は別フェーズとして扱う。
 
 ## 1. 現在地
 
-総合進捗: **76%**
+総合進捗: **78%**
 
 内訳:
 
@@ -16,13 +16,13 @@
 | 取込・文字コード・ラウンドトリップ | 10 | 10 | ✅ | `importer.ts`, `encoding.ts`, roundtrip tests |
 | v3→v4移行 | 10 | 8 | ✅ MVP / 実フィード回帰不足 | `migration.ts` |
 | v4出力・プロファイルフィルタ | 10 | 8 | ✅ MVP / 公開URL検証不足 | `exporter.ts`, `export-profile.ts` |
-| v4検証ルール | 18 | 14 | ✅ 中核 / 親子停留所・運賃ゾーン等の条件付き細部不足 | `validator.ts` |
+| v4検証ルール | 18 | 16 | ✅ 中核 / 均一運賃以外の詳細・実データ精査不足 | `validator.ts` |
 | Google公開ゲート・公開可否判定 | 10 | 8 | ✅ 判定器＋Web表示 / 運用証跡不足 | `release-gate.ts`, `ReleaseGateView.tsx` |
 | 標準validator連携 | 10 | 7 | ✅ report取込＋CLI Java起動 / CI連携未完 | `standard-validator.ts`, `gtfs-acceptance.mjs` |
 | golden sample・実データ検収 | 10 | 3 | ⏳ 判定器あり / サンプル・実データ不足 | `acceptance.ts` |
 | Web編集・出力ワークフロー | 7 | 7 | ✅ 新規作成＋路線/停留所/便追加MVP / 公開ワークフロー未完 | `packages/web` |
 | API・永続化・公開URL運用 | 5 | 3 | ✅ API＋ファイル永続化MVP / revision・publish未完 | `packages/api` |
-| **合計** | **100** | **76** |  |  |
+| **合計** | **100** | **78** |  |  |
 
 読み替え:
 
@@ -75,7 +75,7 @@
 | V4-2-6 | translations検証 | `ja-Hrkt` と対象キー不足を検出 | ✅ MVP |
 | V4-2-7 | fare/attributions/transfers検証 | 実務入力ミスを検出 | ✅ MVP |
 | V4-2-8 | URL/TZ/色/enum詳細検証 | agency_url/timezone/language/route_color/enumを検出 | ✅ |
-| V4-2-9 | parent_station/zone/fare_rules条件 | 親子停留所、運賃ゾーン、均一運賃以外の条件検証 | ⏳ |
+| V4-2-9 | parent_station/zone/fare_rules条件 | 親子停留所、運賃ゾーン、均一運賃以外の条件検証 | ✅ MVP |
 
 ### V4-3 標準validator実行
 

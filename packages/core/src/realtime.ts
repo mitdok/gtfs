@@ -76,6 +76,30 @@ export interface BuildServiceAlertsOptions {
   gtfsRealtimeVersion?: string;
 }
 
+export interface VehiclePositionInput {
+  id: string;
+  vehicleId: string;
+  label?: string;
+  licensePlate?: string;
+  latitude: number;
+  longitude: number;
+  bearing?: number;
+  odometer?: number;
+  speed?: number;
+  timestamp?: number | Date | string;
+  tripId?: string;
+  routeId?: string;
+  startTime?: string;
+  startDate?: string;
+  directionId?: number;
+}
+
+export interface BuildVehiclePositionsOptions {
+  timestamp?: number | Date | string;
+  feedVersion?: string;
+  gtfsRealtimeVersion?: string;
+}
+
 export function buildServiceAlertsFeed(
   alerts: ServiceAlertInput[],
   options: BuildServiceAlertsOptions = {},
@@ -101,6 +125,32 @@ export function encodeServiceAlertsFeed(
   options: BuildServiceAlertsOptions = {},
 ): Uint8Array {
   return rt.FeedMessage.encode(buildServiceAlertsFeed(alerts, options)).finish();
+}
+
+export function buildVehiclePositionsFeed(
+  vehicles: VehiclePositionInput[],
+  options: BuildVehiclePositionsOptions = {},
+): transit_realtime.IFeedMessage {
+  const timestamp = toUnixSeconds(options.timestamp ?? new Date(), "timestamp");
+  const feed: transit_realtime.IFeedMessage = {
+    header: {
+      gtfsRealtimeVersion: options.gtfsRealtimeVersion ?? "2.0",
+      incrementality: rt.FeedHeader.Incrementality.FULL_DATASET,
+      timestamp,
+      ...(options.feedVersion ? { feedVersion: options.feedVersion } : {}),
+    },
+    entity: vehicles.map((vehicle) => buildVehicleEntity(vehicle, timestamp)),
+  };
+  const reason = rt.FeedMessage.verify(feed as unknown as Record<string, unknown>);
+  if (reason) throw new Error(`invalid GTFS-RT FeedMessage: ${reason}`);
+  return feed;
+}
+
+export function encodeVehiclePositionsFeed(
+  vehicles: VehiclePositionInput[],
+  options: BuildVehiclePositionsOptions = {},
+): Uint8Array {
+  return rt.FeedMessage.encode(buildVehiclePositionsFeed(vehicles, options)).finish();
 }
 
 export function decodeRealtimeFeed(bytes: Uint8Array): transit_realtime.FeedMessage {
@@ -187,6 +237,68 @@ function buildAlertEntity(alert: ServiceAlertInput): transit_realtime.IFeedEntit
       ...(alert.url ? { url: translatedString(alert.url, "url") } : {}),
     },
   };
+}
+
+function buildVehicleEntity(vehicle: VehiclePositionInput, feedTimestamp: number): transit_realtime.IFeedEntity {
+  const id = vehicle.id.trim();
+  if (id === "") throw new Error("VehiclePositionInput.id is required");
+  const vehicleId = vehicle.vehicleId.trim();
+  if (vehicleId === "") throw new Error(`vehicle "${id}" vehicleId is required`);
+  if (!isValidPosition(vehicle.latitude, vehicle.longitude)) {
+    throw new Error(`vehicle "${id}" latitude/longitude is out of range`);
+  }
+  if (vehicle.bearing !== undefined && (vehicle.bearing < 0 || vehicle.bearing > 360)) {
+    throw new Error(`vehicle "${id}" bearing must be between 0 and 360`);
+  }
+  if (vehicle.speed !== undefined && vehicle.speed < 0) {
+    throw new Error(`vehicle "${id}" speed must be >= 0`);
+  }
+  if (vehicle.odometer !== undefined && vehicle.odometer < 0) {
+    throw new Error(`vehicle "${id}" odometer must be >= 0`);
+  }
+  const timestamp =
+    vehicle.timestamp === undefined ? feedTimestamp : toUnixSeconds(vehicle.timestamp, "vehicle.timestamp");
+  return {
+    id,
+    vehicle: {
+      ...(vehicle.tripId || vehicle.routeId || vehicle.startTime || vehicle.startDate || vehicle.directionId !== undefined
+        ? {
+            trip: {
+              ...(vehicle.tripId ? { tripId: vehicle.tripId } : {}),
+              ...(vehicle.routeId ? { routeId: vehicle.routeId } : {}),
+              ...(vehicle.startTime ? { startTime: vehicle.startTime } : {}),
+              ...(vehicle.startDate ? { startDate: vehicle.startDate } : {}),
+              ...(vehicle.directionId !== undefined ? { directionId: vehicle.directionId } : {}),
+            },
+          }
+        : {}),
+      vehicle: {
+        id: vehicleId,
+        ...(vehicle.label ? { label: vehicle.label } : {}),
+        ...(vehicle.licensePlate ? { licensePlate: vehicle.licensePlate } : {}),
+      },
+      position: {
+        latitude: vehicle.latitude,
+        longitude: vehicle.longitude,
+        ...(vehicle.bearing !== undefined ? { bearing: vehicle.bearing } : {}),
+        ...(vehicle.odometer !== undefined ? { odometer: vehicle.odometer } : {}),
+        ...(vehicle.speed !== undefined ? { speed: vehicle.speed } : {}),
+      },
+      timestamp,
+    },
+  };
+}
+
+function isValidPosition(lat: number, lon: number): boolean {
+  return (
+    Number.isFinite(lat) &&
+    Number.isFinite(lon) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lon >= -180 &&
+    lon <= 180 &&
+    !(lat === 0 && lon === 0)
+  );
 }
 
 function isAlertActive(alert: ServiceAlertInput, ts: number): boolean {

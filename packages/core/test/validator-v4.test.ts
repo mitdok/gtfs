@@ -185,4 +185,36 @@ describe("GTFS-JP v4 条件付きルール", () => {
     expect(report.issues.some((i) => i.code === "invalid_enum" && i.entity?.field === "timepoint")).toBe(true);
     expect(report.issues.some((i) => i.code === "invalid_color")).toBe(true);
   });
+
+  it("親子停留所とfare_rulesのzone参照を検証する", () => {
+    const report = validateFeed(
+      feedFrom({
+        ...SAMPLE_FILES,
+        ...V4_REQUIRED_FILES,
+        "stops.txt": [
+          "stop_id,stop_name,stop_lat,stop_lon,location_type,parent_station,zone_id",
+          "S1,駅前,34.769100,137.391600,0,S2,Z1",
+          "S2,市役所前,34.766000,137.385000,0,,Z2",
+          "S3,中央病院,34.760000,137.380000,1,S3,",
+          "",
+        ].join("\n"),
+        "fare_attributes.txt": [
+          "fare_id,price,currency_type,payment_method,transfers",
+          "F1,210,JPY,0,",
+          "",
+        ].join("\n"),
+        "fare_rules.txt": [
+          "fare_id,route_id,origin_id,destination_id,contains_id",
+          "F1,R1,Z1,Z9,Z3",
+          "",
+        ].join("\n"),
+      }),
+      { profileId: "gtfs-jp-v4" },
+    );
+
+    expect(report.issues.some((i) => i.code === "invalid_parent_station_type")).toBe(true);
+    expect(report.issues.some((i) => i.code === "invalid_parent_station")).toBe(true);
+    expect(report.issues.some((i) => i.code === "missing_fare_zone" && i.entity?.field === "destination_id")).toBe(true);
+    expect(report.issues.some((i) => i.code === "missing_fare_zone" && i.entity?.field === "contains_id")).toBe(true);
+  });
 });
