@@ -128,4 +128,61 @@ describe("GTFS-JP v4 条件付きルール", () => {
     expect(report.issues.some((i) => i.code === "missing_transfer_endpoint")).toBe(true);
     expect(report.issues.some((i) => i.code === "invalid_transfer_type")).toBe(true);
   });
+
+  it("URL・タイムゾーン・言語タグ・色・enumの不正値を検出する", () => {
+    const report = validateFeed(
+      feedFrom({
+        ...SAMPLE_FILES,
+        ...V4_REQUIRED_FILES,
+        "agency.txt": [
+          "agency_id,agency_name,agency_url,agency_timezone,agency_lang",
+          "toyo,テスト交通,ftp://example.com,Japan/Local,not a lang",
+          "",
+        ].join("\n"),
+        "feed_info.txt": [
+          "feed_publisher_name,feed_publisher_url,feed_lang,feed_start_date,feed_end_date,feed_version",
+          "テスト,example.com,ja,20260401,20261231,v1",
+          "",
+        ].join("\n"),
+        "stops.txt": [
+          "stop_id,stop_name,stop_lat,stop_lon,location_type,wheelchair_boarding",
+          "S1,駅前,34.769100,137.391600,9,9",
+          "S2,市役所前,34.766000,137.385000,0,0",
+          "S3,中央病院,34.760000,137.380000,0,0",
+          "",
+        ].join("\n"),
+        "routes.txt": [
+          "route_id,agency_id,route_short_name,route_long_name,route_type,route_color",
+          "R1,toyo,1,テスト線,99,#336699",
+          "",
+        ].join("\n"),
+        "trips.txt": [
+          "route_id,service_id,trip_id,trip_headsign,wheelchair_accessible",
+          "R1,weekday,T1,中央病院,9",
+          "R1,weekday,T2,中央病院,0",
+          "",
+        ].join("\n"),
+        "stop_times.txt": [
+          "trip_id,arrival_time,departure_time,stop_id,stop_sequence,pickup_type,drop_off_type,timepoint",
+          "T1,07:00:00,07:00:00,S1,1,9,0,1",
+          "T1,07:05:00,07:05:00,S2,2,0,9,1",
+          "T1,07:12:00,07:12:00,S3,3,0,0,9",
+          "T2,25:00:00,25:00:00,S1,1,0,0,1",
+          "T2,25:05:00,25:05:00,S2,2,0,0,1",
+          "T2,25:12:00,25:12:00,S3,3,0,0,1",
+          "",
+        ].join("\n"),
+      }),
+      { profileId: "gtfs-jp-v4" },
+    );
+
+    expect(report.issues.some((i) => i.code === "invalid_url" && i.entity?.field === "agency_url")).toBe(true);
+    expect(report.issues.some((i) => i.code === "invalid_timezone")).toBe(true);
+    expect(report.issues.some((i) => i.code === "invalid_language")).toBe(true);
+    expect(report.issues.some((i) => i.code === "invalid_enum" && i.entity?.field === "location_type")).toBe(true);
+    expect(report.issues.some((i) => i.code === "invalid_enum" && i.entity?.field === "route_type")).toBe(true);
+    expect(report.issues.some((i) => i.code === "invalid_enum" && i.entity?.field === "pickup_type")).toBe(true);
+    expect(report.issues.some((i) => i.code === "invalid_enum" && i.entity?.field === "timepoint")).toBe(true);
+    expect(report.issues.some((i) => i.code === "invalid_color")).toBe(true);
+  });
 });

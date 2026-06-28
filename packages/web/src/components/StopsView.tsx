@@ -5,7 +5,7 @@
  * - 座標の真実は数値データ（F-10-5）。lat/lon はテーブル側でも直接編集できる。
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getRows, getTable, type Feed } from "@gtfs-studio/core";
+import { getRows, getTable, setTable, type Feed, type FeedTable } from "@gtfs-studio/core";
 import type { MapAdapter } from "../map/adapter";
 import { MapLibreAdapter } from "../map/maplibreAdapter";
 import { isFallbackBasemap, resolveBasemapStyle } from "../map/style";
@@ -14,6 +14,31 @@ interface Props {
   feed: Feed;
   version: number;
   mutateFeed: (fn: (feed: Feed) => void) => void;
+}
+
+const DEFAULT_LNG_LAT = { lat: 34.7691, lon: 137.3916 };
+const STOP_COLUMNS = ["stop_id", "stop_name", "stop_lat", "stop_lon", "location_type"];
+const TRANSLATION_COLUMNS = ["table_name", "field_name", "language", "translation", "record_id"];
+
+function ensureTable(feed: Feed, name: string, columns: string[]): FeedTable {
+  const existing = getTable(feed, name);
+  if (existing) {
+    for (const col of columns) {
+      if (!existing.columns.includes(col)) existing.columns.push(col);
+    }
+    return existing;
+  }
+  setTable(feed, name, [], columns);
+  return getTable(feed, name)!;
+}
+
+function nextId(rows: Record<string, string>[], key: string, prefix: string): string {
+  const used = new Set(rows.map((row) => row[key] ?? ""));
+  for (let n = rows.length + 1; n < rows.length + 10000; n += 1) {
+    const id = `${prefix}${n}`;
+    if (!used.has(id)) return id;
+  }
+  return `${prefix}${Date.now()}`;
 }
 
 export function StopsView({ feed, version, mutateFeed }: Props) {
@@ -121,12 +146,60 @@ export function StopsView({ feed, version, mutateFeed }: Props) {
     }
   }, [mapReady, selectedId]);
 
-  const editCoord = (stopId: string, key: "stop_lat" | "stop_lon", value: string) => {
+  const editStopField = (
+    stopId: string,
+    key: "stop_name" | "stop_lat" | "stop_lon" | "stop_name_kana",
+    value: string,
+  ) => {
     mutateFeed((f) => {
       for (const row of getRows(f, "stops")) {
         if ((row["stop_id"] ?? "") === stopId) row[key] = value;
       }
+      if (key === "stop_name") {
+        for (const row of getRows(f, "translations")) {
+          if (
+            (row["table_name"] ?? "") === "stops" &&
+            (row["field_name"] ?? "") === "stop_name" &&
+            (row["record_id"] ?? "") === stopId
+          ) {
+            row["translation"] = value;
+          }
+        }
+      }
     });
+  };
+
+  const addStop = () => {
+    let createdId = "";
+    mutateFeed((f) => {
+      const stopsTable = ensureTable(f, "stops", STOP_COLUMNS);
+      const source =
+        (selectedId ? stopsTable.rows.find((row) => (row["stop_id"] ?? "") === selectedId) : undefined) ??
+        stopsTable.rows[0];
+      const lat = Number(source?.["stop_lat"]);
+      const lon = Number(source?.["stop_lon"]);
+      const id = nextId(stopsTable.rows, "stop_id", "S");
+      const name = `新しい停留所${stopsTable.rows.length + 1}`;
+      stopsTable.rows.push({
+        stop_id: id,
+        stop_name: name,
+        stop_lat: (Number.isFinite(lat) ? lat : DEFAULT_LNG_LAT.lat).toFixed(6),
+        stop_lon: (Number.isFinite(lon) ? lon : DEFAULT_LNG_LAT.lon).toFixed(6),
+        location_type: "0",
+      });
+
+      const translationsTable = ensureTable(f, "translations", TRANSLATION_COLUMNS);
+      translationsTable.rows.push({
+        table_name: "stops",
+        field_name: "stop_name",
+        language: "ja-Hrkt",
+        translation: name,
+        record_id: id,
+      });
+      createdId = id;
+    });
+    setSelectedId(createdId);
+    setQuery("");
   };
 
   const hasKana = Boolean(getTable(feed, "stops")?.columns.includes("stop_name_kana"));
@@ -134,12 +207,17 @@ export function StopsView({ feed, version, mutateFeed }: Props) {
   return (
     <div className="stops-view">
       <div className="stops-table-pane">
-        <input
-          className="search"
-          placeholder="停留所名・IDで検索"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+        <div className="table-toolbar">
+          <input
+            className="search"
+            placeholder="停留所名・IDで検索"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <button type="button" onClick={addStop}>
+            停留所追加
+          </button>
+        </div>
         <div className="table-scroll">
           <table>
             <thead>
@@ -161,13 +239,29 @@ export function StopsView({ feed, version, mutateFeed }: Props) {
                     onClick={() => setSelectedId(id)}
                   >
                     <td className="mono">{id}</td>
-                    <td>{s["stop_name"]}</td>
-                    {hasKana && <td className="kana">{s["stop_name_kana"]}</td>}
+                    <td>
+                      <input
+                        className="stop-name-input"
+                        value={s["stop_name"] ?? ""}
+                        onChange={(e) => editStopField(id, "stop_name", e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </td>
+                    {hasKana && (
+                      <td className="kana">
+                        <input
+                          className="stop-name-input kana"
+                          value={s["stop_name_kana"] ?? ""}
+                          onChange={(e) => editStopField(id, "stop_name_kana", e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </td>
+                    )}
                     <td>
                       <input
                         className="coord"
                         value={s["stop_lat"] ?? ""}
-                        onChange={(e) => editCoord(id, "stop_lat", e.target.value)}
+                        onChange={(e) => editStopField(id, "stop_lat", e.target.value)}
                         onClick={(e) => e.stopPropagation()}
                       />
                     </td>
@@ -175,7 +269,7 @@ export function StopsView({ feed, version, mutateFeed }: Props) {
                       <input
                         className="coord"
                         value={s["stop_lon"] ?? ""}
-                        onChange={(e) => editCoord(id, "stop_lon", e.target.value)}
+                        onChange={(e) => editStopField(id, "stop_lon", e.target.value)}
                         onClick={(e) => e.stopPropagation()}
                       />
                     </td>

@@ -34,6 +34,7 @@ export interface FieldDef {
   name: string;
   required?: boolean;
   presence?: FieldPresence;
+  type?: string;
 }
 
 export interface FileDef {
@@ -154,11 +155,11 @@ const DEFINITIONS: Record<string, ProfileDefinition> = (() => {
 // --- 定義 → 実行時 Profile への変換 -------------------------------------------
 
 function toFieldDef(f: FieldDefinition): FieldDef {
-  if (f.presence === "required") return { name: f.name, required: true };
+  if (f.presence === "required") return { name: f.name, required: true, type: f.type };
   if (f.presence === "recommended" || f.presence === "optional" || f.presence === "conditionallyRequired") {
-    return { name: f.name, presence: f.presence };
+    return { name: f.name, presence: f.presence, type: f.type };
   }
-  return { name: f.name };
+  return { name: f.name, type: f.type };
 }
 
 function toFileDef(f: FileDefinition): FileDef {

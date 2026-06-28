@@ -39,6 +39,7 @@ export function validateFeed(feed: Feed, options: ValidateOptions = {}): Validat
   checkRequiredFiles(feed, profile, issues);
   checkRecommendedFiles(feed, profile, issues);
   checkRequiredFields(feed, profile, issues);
+  checkFieldTypes(feed, profile, issues);
   checkUniqueIds(feed, issues);
   checkReferences(feed, issues);
   checkCoordinates(feed, issues);
@@ -161,6 +162,134 @@ function checkRequiredFields(feed: Feed, profile: Profile, issues: ValidationIss
       }
     }
   }
+}
+
+function checkFieldTypes(feed: Feed, profile: Profile, issues: ValidationIssue[]) {
+  for (const file of profile.files) {
+    const table = feed.tables.get(file.name);
+    if (!table) continue;
+    for (const field of file.fields) {
+      if (!field.type || !table.columns.includes(field.name)) continue;
+      for (const row of table.rows) {
+        const value = (row[field.name] ?? "").trim();
+        if (value === "") continue;
+        const issue = validateTypedField(file.name, field.name, field.type, value, row);
+        if (issue) issues.push(issue);
+      }
+    }
+  }
+}
+
+function validateTypedField(
+  table: string,
+  field: string,
+  type: string,
+  value: string,
+  row: Record<string, string>,
+): ValidationIssue | undefined {
+  if (type === "url" && !isHttpUrl(value)) {
+    return invalidValue(table, rowId(row), field, value, "invalid_url", "http/https URLではありません");
+  }
+  if (type === "timezone" && !isValidTimeZone(value)) {
+    return invalidValue(table, rowId(row), field, value, "invalid_timezone", "IANAタイムゾーンではありません");
+  }
+  if (type === "language" && !isValidLanguageTag(value)) {
+    return invalidValue(table, rowId(row), field, value, "invalid_language", "言語タグではありません");
+  }
+  if (type === "integer" && !/^\d+$/.test(value)) {
+    return invalidValue(table, rowId(row), field, value, "invalid_integer", "整数ではありません");
+  }
+  if (type === "latitude" && !isNumberInRange(value, -90, 90)) {
+    return invalidValue(table, rowId(row), field, value, "invalid_latitude", "緯度の範囲外です");
+  }
+  if (type === "longitude" && !isNumberInRange(value, -180, 180)) {
+    return invalidValue(table, rowId(row), field, value, "invalid_longitude", "経度の範囲外です");
+  }
+  if (type === "date" && !isValidGtfsDate(value)) {
+    return invalidValue(table, rowId(row), field, value, "invalid_date_format", "YYYYMMDDではありません");
+  }
+  if (type === "enum") {
+    return validateKnownEnum(table, field, value, row);
+  }
+  return undefined;
+}
+
+function validateKnownEnum(
+  table: string,
+  field: string,
+  value: string,
+  row: Record<string, string>,
+): ValidationIssue | undefined {
+  const allowed = enumValuesFor(table, field);
+  if (!allowed) return /^\d+$/.test(value) ? undefined : invalidValue(table, rowId(row), field, value, "invalid_enum", "数値enumではありません");
+  if (allowed.includes(value)) return undefined;
+  return invalidValue(table, rowId(row), field, value, "invalid_enum", `許容値（${allowed.join(",")}）ではありません`);
+}
+
+function enumValuesFor(table: string, field: string): string[] | undefined {
+  if (table === "stops" && field === "location_type") return ["0", "1", "2", "3", "4"];
+  if (table === "routes" && field === "route_type") return ["0", "1", "2", "3", "4", "5", "6", "7", "11", "12"];
+  return undefined;
+}
+
+function invalidValue(
+  table: string,
+  id: string,
+  field: string,
+  value: string,
+  code: string,
+  reason: string,
+): ValidationIssue {
+  return {
+    severity: "error",
+    code,
+    message: `${table}.txt ${id ? `id="${id}" ` : ""}の ${field}="${value}" は不正です（${reason}）`,
+    entity: { type: table, id, field, value },
+  };
+}
+
+function rowId(row: Record<string, string>): string {
+  return (
+    row["agency_id"] ??
+    row["stop_id"] ??
+    row["route_id"] ??
+    row["trip_id"] ??
+    row["service_id"] ??
+    row["fare_id"] ??
+    ""
+  ).trim();
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function isValidTimeZone(value: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value }).format();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isValidLanguageTag(value: string): boolean {
+  try {
+    Intl.getCanonicalLocales(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isNumberInRange(value: string, min: number, max: number): boolean {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= min && n <= max;
 }
 
 // --- 主キー一意性 ---------------------------------------------------------
@@ -491,6 +620,7 @@ function checkGtfsJpV4(feed: Feed, issues: ValidationIssue[]) {
   checkGtfsJpFareAttributes(feed, issues);
   checkGtfsJpAttributions(feed, issues);
   checkGtfsJpTransfers(feed, issues);
+  checkGtfsJpOptionalValueFormats(feed, issues);
   checkFeedInfoDates(feed, issues);
 }
 
@@ -724,6 +854,39 @@ function checkGtfsJpTransfers(feed: Feed, issues: ValidationIssue[]) {
         entity: { type: "transfers", field: "transfer_type", value: type },
       });
     }
+  }
+}
+
+function checkGtfsJpOptionalValueFormats(feed: Feed, issues: ValidationIssue[]) {
+  for (const row of getRows(feed, "routes")) {
+    const id = (row["route_id"] ?? "").trim();
+    for (const field of ["route_color", "route_text_color"] as const) {
+      const value = (row[field] ?? "").trim();
+      if (value !== "" && !/^[0-9A-Fa-f]{6}$/.test(value)) {
+        issues.push(invalidValue("routes", id, field, value, "invalid_color", "6桁hex（#なし）ではありません"));
+      }
+    }
+  }
+
+  checkOptionalEnum(feed, issues, "stops", "stop_id", "wheelchair_boarding", ["0", "1", "2"]);
+  checkOptionalEnum(feed, issues, "trips", "trip_id", "wheelchair_accessible", ["0", "1", "2"]);
+  checkOptionalEnum(feed, issues, "stop_times", "trip_id", "pickup_type", ["0", "1", "2", "3"]);
+  checkOptionalEnum(feed, issues, "stop_times", "trip_id", "drop_off_type", ["0", "1", "2", "3"]);
+  checkOptionalEnum(feed, issues, "stop_times", "trip_id", "timepoint", ["0", "1"]);
+}
+
+function checkOptionalEnum(
+  feed: Feed,
+  issues: ValidationIssue[],
+  table: string,
+  idField: string,
+  field: string,
+  allowed: string[],
+) {
+  for (const row of getRows(feed, table)) {
+    const value = (row[field] ?? "").trim();
+    if (value === "" || allowed.includes(value)) continue;
+    issues.push(invalidValue(table, (row[idField] ?? "").trim(), field, value, "invalid_enum", `許容値（${allowed.join(",")}）ではありません`));
   }
 }
 

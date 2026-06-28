@@ -5,7 +5,7 @@
 
 - 最終更新: 2026-06-16
 - 対象コミット: 本ファイルと同一リビジョン
-- コア・テスト: 93 件 pass（`pnpm --filter @gtfs-studio/core test`）
+- コア・テスト: 94 件 pass（`pnpm --filter @gtfs-studio/core test`）
 - API・テスト: 16 件 pass（`pnpm --filter @gtfs-studio/api test`）
 
 ## 1. パイプライン全体
@@ -70,6 +70,7 @@
 | calendar | `invalid_date_format`, `calendar_end_before_start`, `invalid_calendar_day_flag`, `service_empty`, `invalid_exception_type` |
 | GTFS-JP | `legacy_jp_file`, `missing_stop_name_kana`, `invalid_fare_price`, `non_jpy_fare_currency` |
 | GTFS-JP v4 条件付き | `forbidden_v4_fixed_route_field`, `forbidden_v4_network_file`, `missing_trip_shape_id`, `invalid_shape_pt_lat`, `invalid_shape_pt_lon`, `duplicate_shape_pt_sequence`, `missing_translation_record_key`, `invalid_fare_payment_method`, `invalid_fare_transfers`, `missing_attribution_role`, `missing_transfer_endpoint`, `invalid_transfer_type` |
+| 型・値形式 | `invalid_url`, `invalid_timezone`, `invalid_language`, `invalid_integer`, `invalid_latitude`, `invalid_longitude`, `invalid_enum`, `invalid_color` |
 | feed_info | `feed_info_date_range` |
 | Google公開ゲート | `missing_shape_recommended`, `missing_trip_headsign`, `feed_expired`, `feed_expired_soon`, `unstable_public_ids`, `missing_contact` |
 
