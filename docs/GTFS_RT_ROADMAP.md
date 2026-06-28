@@ -29,7 +29,7 @@
 | RT-0 | 調査・設計固定 | 本ロードマップ、仕様07章更新、受入基準 | ✅ 着手 |
 | RT-1 | ServiceAlerts最小実装 | 手動Alert入力モデル、protobuf生成、HTTP配信 | ✅ core store＋API pb配信完了 / Webはローカル保存 |
 | RT-2 | 外部GTFS-RT中継 | 既存 `.pb` の取得、検証、キャッシュ、再配信 | ✅ core relay＋api poller/配信完了 |
-| RT-3 | VehiclePositions取込 | GPS/外部JSON入力、車両位置Feed生成 | ⏳ core builder着手 |
+| RT-3 | VehiclePositions取込 | GPS/外部JSON入力、車両位置Feed生成 | ⏳ core store＋API配信完了 / 認証・地図表示未実装 |
 | RT-4 | TripUpdates生成 | 静的GTFSとの突合、遅延算出、StopTimeUpdate生成 | ⏳ 未着手 |
 | RT-5 | 運用品質 | 監視、鮮度SLO、公開URL検証、Google申請前チェック | ⏳ 未着手 |
 
@@ -61,11 +61,12 @@
 
 | ID | タスク | 受入基準 | 状態 |
 |----|--------|----------|------|
-| RT-3-1 | ingest API | 車両ID、緯度経度、timestamp、route/trip候補を受け取る | ⏳ |
+| RT-3-1 | ingest API | 車両ID、緯度経度、timestamp、route/trip候補を受け取る | ✅ MVP |
 | RT-3-2 | 認証・レート制限 | source token単位で認証し、不正入力を拒否 | ⏳ |
 | RT-3-3 | 座標検証 | lat/lon範囲、timestamp鮮度、vehicle_id必須を検証 | ✅ core MVP |
 | RT-3-4 | VehiclePosition生成 | vehicle/trip/position/timestampをprotobuf化 | ✅ core MVP |
 | RT-3-5 | 地図デバッグ表示 | Webで最新車両位置とageを確認できる | ⏳ |
+| RT-3-6 | VehiclePositions HTTP配信 | `GET /rt/vehicles.pb` で最新車両位置を配信できる | ✅ MVP |
 
 ### RT-4 TripUpdates
 
@@ -116,5 +117,6 @@
 2. ~~ServiceAlertsのbuilderをcoreへ追加する。~~ ✅
 3. ~~API側で手動Alert CRUDと `alerts.pb` HTTP配信を実装する。~~ ✅
 4. WebのローカルAlert保存をAPI保存へ接続する。
-5. VehiclePositions ingest APIと最新位置ストアを追加する。
-6. 外部GTFS-RT中継のsourceモデルとpoller設計へ進む。 ✅ RT-2完了
+5. ~~VehiclePositions ingest APIと最新位置ストアを追加する。~~ ✅
+6. VehiclePositionsのsource token認証・レート制限を追加する。
+7. 外部GTFS-RT中継のsourceモデルとpoller設計へ進む。 ✅ RT-2完了

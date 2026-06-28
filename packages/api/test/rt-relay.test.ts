@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
-import { createRealtimeAlertStore, decodeRealtimeFeed, encodeServiceAlertsFeed } from "@gtfs-studio/core/realtime";
+import {
+  createRealtimeAlertStore,
+  createRealtimeVehicleStore,
+  decodeRealtimeFeed,
+  encodeServiceAlertsFeed,
+} from "@gtfs-studio/core/realtime";
 import { openSpecLockRepository } from "../src/spec-lock-repository.js";
 import { createRtRelayService, type RtFetch, type RtFetchResponse } from "../src/rt-relay.js";
 import { createApiServer } from "../src/server.js";
@@ -99,7 +104,7 @@ describe("RT-2 中継エンドポイント", () => {
     });
   });
   afterEach(async () => {
-    await new Promise<void>((r) => server.close(() => r()));
+    if (server) await new Promise<void>((r) => server.close(() => r()));
   });
 
   it("GET /rt/sources は登録済みsourceを返す", async () => {
@@ -227,5 +232,77 @@ describe("RT-1 手動ServiceAlerts API", () => {
     const del = await fetch(`${base}/rt/alerts/manual-2`, { method: "DELETE" });
     expect((await del.json()).removed).toBe(true);
     expect((await fetch(`${base}/rt/alerts/manual-2`)).status).toBe(404);
+  });
+});
+
+describe("RT-3 VehiclePositions API", () => {
+  let server: Server;
+  let base: string;
+
+  beforeEach(async () => {
+    const repository = openSpecLockRepository("/tmp/__rt_vehicle_locks_unused.json");
+    server = createApiServer({
+      repository,
+      rtVehicles: createRealtimeVehicleStore(),
+      rtNow: () => 1_781_568_000,
+    });
+    base = await new Promise((resolve) => {
+      server.listen(0, "127.0.0.1", () => {
+        const { port } = server.address() as AddressInfo;
+        resolve(`http://127.0.0.1:${port}`);
+      });
+    });
+  });
+  afterEach(async () => {
+    await new Promise<void>((r) => server.close(() => r()));
+  });
+
+  it("VehiclePositionを登録・取得・protobuf配信できる", async () => {
+    const post = await fetch(`${base}/rt/vehicles`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        id: "veh-1",
+        vehicleId: "bus-1",
+        latitude: 34.7691,
+        longitude: 137.3916,
+        routeId: "R1",
+      }),
+    });
+    expect(post.status).toBe(200);
+    expect((await post.json()).vehicleId).toBe("bus-1");
+
+    const list = await fetch(`${base}/rt/vehicles`);
+    expect((await list.json()).vehicles.map((v: { id: string }) => v.id)).toEqual(["veh-1"]);
+
+    const pb = await fetch(`${base}/rt/vehicles.pb`);
+    expect(pb.status).toBe(200);
+    expect(pb.headers.get("content-type")).toContain("x-protobuf");
+    const feed = decodeRealtimeFeed(new Uint8Array(await pb.arrayBuffer()));
+    expect(feed.entity[0]?.id).toBe("veh-1");
+    expect(feed.entity[0]?.vehicle?.vehicle?.id).toBe("bus-1");
+    expect(feed.entity[0]?.vehicle?.trip?.routeId).toBe("R1");
+  });
+
+  it("PUT/DELETEでVehiclePositionを更新・削除できる", async () => {
+    const put = await fetch(`${base}/rt/vehicles/veh-2`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        vehicleId: "bus-2",
+        latitude: 34.76,
+        longitude: 137.38,
+        speed: 6.5,
+      }),
+    });
+    expect(put.status).toBe(200);
+    expect((await put.json()).id).toBe("veh-2");
+
+    const get = await fetch(`${base}/rt/vehicles/veh-2`);
+    expect((await get.json()).speed).toBe(6.5);
+
+    const del = await fetch(`${base}/rt/vehicles/veh-2`, { method: "DELETE" });
+    expect((await del.json()).removed).toBe(true);
+    expect((await fetch(`${base}/rt/vehicles/veh-2`)).status).toBe(404);
   });
 });

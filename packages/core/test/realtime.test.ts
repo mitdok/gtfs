@@ -3,6 +3,7 @@ import {
   buildServiceAlertsFeed,
   buildVehiclePositionsFeed,
   createRealtimeAlertStore,
+  createRealtimeVehicleStore,
   decodeRealtimeFeed,
   encodeServiceAlertsFeed,
   encodeVehiclePositionsFeed,
@@ -186,5 +187,34 @@ describe("GTFS-RT VehiclePositions", () => {
         { id: "bad", vehicleId: "v1", latitude: 34.7, longitude: 137.3, bearing: 361 },
       ]),
     ).toThrow(/bearing/);
+  });
+
+  it("VehiclePositionストアで最新位置を保持しFeed化できる", () => {
+    const store = createRealtimeVehicleStore();
+    store.upsert(
+      {
+        id: "veh-1",
+        vehicleId: "bus-1",
+        latitude: 34.7691,
+        longitude: 137.3916,
+        timestamp: "2026-06-16T00:00:30Z",
+        routeId: "R1",
+      },
+      "2026-06-16T00:00:40Z",
+    );
+    store.upsert(
+      {
+        id: "veh-2",
+        vehicleId: "bus-2",
+        latitude: 34.76,
+        longitude: 137.38,
+      },
+      "2026-06-16T00:01:00Z",
+    );
+
+    expect(store.list().map((v) => v.id)).toEqual(["veh-1", "veh-2"]);
+    expect(store.get("veh-1")?.updatedAt).toBe("2026-06-16T00:00:30.000Z");
+    const feed = decodeRealtimeFeed(store.encode({ timestamp: "2026-06-16T00:01:00Z" }));
+    expect(feed.entity.map((entity) => entity.vehicle?.vehicle?.id)).toEqual(["bus-1", "bus-2"]);
   });
 });

@@ -14,7 +14,12 @@ import {
   type SpecLockId,
 } from "@gtfs-studio/core";
 import type { RtSource } from "@gtfs-studio/core/realtime";
-import type { RealtimeAlertStore, ServiceAlertInput } from "@gtfs-studio/core/realtime";
+import type {
+  RealtimeAlertStore,
+  RealtimeVehicleStore,
+  ServiceAlertInput,
+  VehiclePositionInput,
+} from "@gtfs-studio/core/realtime";
 import type { SpecLockRepository } from "./spec-lock-repository.js";
 import type { RtRelayService } from "./rt-relay.js";
 
@@ -33,6 +38,8 @@ export interface ApiOptions {
   rtRelay?: RtRelayService;
   /** 手動ServiceAlerts保存・配信用ストア（未指定なら /rt/alerts 系は 501）。 */
   rtAlerts?: RealtimeAlertStore;
+  /** VehiclePositions保存・配信用ストア（未指定なら /rt/vehicles 系は 501）。 */
+  rtVehicles?: RealtimeVehicleStore;
   /** `.pb` 再配信時の age 算定基準（Unix秒）。テスト用。既定は実時刻。 */
   rtNow?: () => number;
 }
@@ -205,6 +212,47 @@ export function createApiServer(options: ApiOptions): Server {
         if (method === "PUT") {
           const body = (await readJsonBody(req)) as Partial<ServiceAlertInput & { enabled: boolean }>;
           const stored = store.upsert({ ...(body as ServiceAlertInput), id }, rtNow());
+          return sendJson(res, 200, stored);
+        }
+        if (method === "DELETE") {
+          return sendJson(res, 200, { removed: store.remove(id) });
+        }
+        return sendJson(res, 405, { error: "method not allowed" });
+      }
+
+      if (path === "/rt/vehicles") {
+        const store = options.rtVehicles;
+        if (!store) return sendJson(res, 501, { error: "rt vehicles are not configured" });
+        if (method === "GET") return sendJson(res, 200, { vehicles: store.list() });
+        if (method === "POST") {
+          const body = (await readJsonBody(req)) as Partial<VehiclePositionInput>;
+          if (!body.id) return sendJson(res, 400, { error: "id is required" });
+          const stored = store.upsert(body as VehiclePositionInput, rtNow());
+          return sendJson(res, 200, stored);
+        }
+        return sendJson(res, 405, { error: "method not allowed" });
+      }
+
+      if (path === "/rt/vehicles.pb" && method === "GET") {
+        const store = options.rtVehicles;
+        if (!store) return sendJson(res, 501, { error: "rt vehicles are not configured" });
+        return sendBytes(res, 200, store.encode({ timestamp: rtNow() }), {
+          "cache-control": "no-cache",
+        });
+      }
+
+      const vehicleMatch = path.match(/^\/rt\/vehicles\/([^/]+)$/);
+      if (vehicleMatch) {
+        const store = options.rtVehicles;
+        if (!store) return sendJson(res, 501, { error: "rt vehicles are not configured" });
+        const id = decodeURIComponent(vehicleMatch[1]!);
+        if (method === "GET") {
+          const vehicle = store.get(id);
+          return vehicle ? sendJson(res, 200, vehicle) : sendJson(res, 404, { error: "not found" });
+        }
+        if (method === "PUT") {
+          const body = (await readJsonBody(req)) as Partial<VehiclePositionInput>;
+          const stored = store.upsert({ ...(body as VehiclePositionInput), id }, rtNow());
           return sendJson(res, 200, stored);
         }
         if (method === "DELETE") {

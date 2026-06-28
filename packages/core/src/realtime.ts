@@ -94,6 +94,20 @@ export interface VehiclePositionInput {
   directionId?: number;
 }
 
+export interface StoredVehiclePosition extends VehiclePositionInput {
+  updatedAt: string;
+  receivedAt: string;
+}
+
+export interface RealtimeVehicleStore {
+  list(): StoredVehiclePosition[];
+  get(id: string): StoredVehiclePosition | undefined;
+  upsert(vehicle: VehiclePositionInput, now?: number | Date | string): StoredVehiclePosition;
+  remove(id: string): boolean;
+  clear(): void;
+  encode(options?: BuildVehiclePositionsOptions): Uint8Array;
+}
+
 export interface BuildVehiclePositionsOptions {
   timestamp?: number | Date | string;
   feedVersion?: string;
@@ -205,6 +219,44 @@ export function createRealtimeAlertStore(initialAlerts: ServiceAlertInput[] = []
     },
   };
   for (const alert of initialAlerts) store.upsert(alert);
+  return store;
+}
+
+export function createRealtimeVehicleStore(initialVehicles: VehiclePositionInput[] = []): RealtimeVehicleStore {
+  const vehicles = new Map<string, StoredVehiclePosition>();
+  const store: RealtimeVehicleStore = {
+    list() {
+      return [...vehicles.values()].map(cloneStoredVehicle).sort((a, b) => a.id.localeCompare(b.id));
+    },
+    get(id: string) {
+      const vehicle = vehicles.get(id);
+      return vehicle ? cloneStoredVehicle(vehicle) : undefined;
+    },
+    upsert(vehicle, now = new Date()) {
+      buildVehiclePositionsFeed([vehicle], { timestamp: now });
+      const receivedAt = new Date(toUnixSeconds(now, "now") * 1000).toISOString();
+      const updatedAt = new Date(
+        toUnixSeconds(vehicle.timestamp ?? now, "vehicle.timestamp") * 1000,
+      ).toISOString();
+      const stored: StoredVehiclePosition = {
+        ...cloneVehicleInput(vehicle),
+        receivedAt,
+        updatedAt,
+      };
+      vehicles.set(stored.id, stored);
+      return cloneStoredVehicle(stored);
+    },
+    remove(id: string) {
+      return vehicles.delete(id);
+    },
+    clear() {
+      vehicles.clear();
+    },
+    encode(options = {}) {
+      return encodeVehiclePositionsFeed(this.list(), options);
+    },
+  };
+  for (const vehicle of initialVehicles) store.upsert(vehicle);
   return store;
 }
 
@@ -331,6 +383,34 @@ function cloneAlertInput(alert: ServiceAlertInput): ServiceAlertInput {
     headerText: { ...alert.headerText },
     descriptionText: alert.descriptionText ? { ...alert.descriptionText } : undefined,
     url: alert.url ? { ...alert.url } : undefined,
+  };
+}
+
+function cloneStoredVehicle(vehicle: StoredVehiclePosition): StoredVehiclePosition {
+  return {
+    ...cloneVehicleInput(vehicle),
+    updatedAt: vehicle.updatedAt,
+    receivedAt: vehicle.receivedAt,
+  };
+}
+
+function cloneVehicleInput(vehicle: VehiclePositionInput): VehiclePositionInput {
+  return {
+    id: vehicle.id,
+    vehicleId: vehicle.vehicleId,
+    label: vehicle.label,
+    licensePlate: vehicle.licensePlate,
+    latitude: vehicle.latitude,
+    longitude: vehicle.longitude,
+    bearing: vehicle.bearing,
+    odometer: vehicle.odometer,
+    speed: vehicle.speed,
+    timestamp: vehicle.timestamp,
+    tripId: vehicle.tripId,
+    routeId: vehicle.routeId,
+    startTime: vehicle.startTime,
+    startDate: vehicle.startDate,
+    directionId: vehicle.directionId,
   };
 }
 

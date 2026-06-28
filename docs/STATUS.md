@@ -5,8 +5,8 @@
 
 - 最終更新: 2026-06-29
 - 対象コミット: 本ファイルと同一リビジョン
-- コア・テスト: 97 件 pass（`pnpm --filter @gtfs-studio/core test`）
-- API・テスト: 18 件 pass（`pnpm --filter @gtfs-studio/api test`）
+- コア・テスト: 98 件 pass（`pnpm --filter @gtfs-studio/core test`）
+- API・テスト: 20 件 pass（`pnpm --filter @gtfs-studio/api test`）
 
 ## 1. パイプライン全体
 
@@ -119,7 +119,7 @@ GTFS-RTはフェーズ2以降の対象。ロードマップ、課題、達成管
 | RT-0 | ✅ 着手 | 公式参照確認、ロードマップ・課題・達成管理表の整備 |
 | RT-1 | ✅ core store＋API pb配信完了 / Webはローカル保存 | ServiceAlerts手動投入＋protobuf配信（`src/realtime.ts`, `api/server.ts`, `RealtimeAlertsView.tsx`） |
 | RT-2 | ✅ core relay＋api poller/配信 | 外部GTFS-RT中継・正規化（`realtime-relay.ts`, `api/rt-relay.ts`） |
-| RT-3 | ⏳ core builder着手 | VehiclePositions protobuf生成（`src/realtime.ts`）。ingest API・地図表示は未実装 |
+| RT-3 | ⏳ core store＋API pb配信完了 / 認証・地図表示未実装 | VehiclePositions protobuf生成・最新位置保存・HTTP配信（`src/realtime.ts`, `api/server.ts`） |
 | RT-4 | ⏳ 未着手 | TripUpdates生成・静的GTFS突合 |
 | RT-5 | ⏳ 未着手 | 鮮度SLO、監視、公開URL検証 |
 
