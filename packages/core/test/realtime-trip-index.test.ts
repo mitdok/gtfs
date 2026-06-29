@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { importEntries } from "../src/importer.js";
-import { buildRealtimeTripIndex, tripDelayToTripUpdate } from "../src/realtime-trip-index.js";
+import {
+  buildRealtimeTripIndex,
+  findRealtimeTripCandidates,
+  matchedTripDelayToTripUpdate,
+  tripDelayToTripUpdate,
+} from "../src/realtime-trip-index.js";
 import { decodeRealtimeFeed, encodeTripUpdatesFeed } from "../src/realtime.js";
 import { sampleEntries } from "./fixtures.js";
 
@@ -51,6 +56,50 @@ describe("GTFS-RT TripUpdates static index", () => {
     expect(update.stopTimeUpdates[0]?.arrivalDelay).toBe(-60);
   });
 
+  it("route_id と時刻から近いtrip候補を返す", () => {
+    const index = buildRealtimeTripIndex(sampleFeed());
+    const matches = findRealtimeTripCandidates(index, {
+      routeId: "R1",
+      serviceId: "weekday",
+      atTime: "07:04:30",
+      atStopId: "S2",
+      maxTimeDiffSec: 120,
+    });
+
+    expect(matches.map((match) => match.trip.tripId)).toEqual(["T1"]);
+    expect(matches[0]?.matchedStopTime?.stopId).toBe("S2");
+    expect(matches[0]?.timeDiffSec).toBe(30);
+  });
+
+  it("24時超のGTFS時刻で深夜便を候補にできる", () => {
+    const index = buildRealtimeTripIndex(sampleFeed());
+    const matches = findRealtimeTripCandidates(index, {
+      routeId: "R1",
+      atTime: "25:04:00",
+      atStopId: "S2",
+      maxTimeDiffSec: 120,
+    });
+
+    expect(matches.map((match) => match.trip.tripId)).toEqual(["T2"]);
+  });
+
+  it("最も近いtrip候補から遅延TripUpdateを作る", () => {
+    const index = buildRealtimeTripIndex(sampleFeed());
+    const update = matchedTripDelayToTripUpdate(index, {
+      routeId: "R1",
+      atTime: "07:05:30",
+      atStopId: "S2",
+      maxTimeDiffSec: 120,
+      delaySec: 90,
+      vehicleId: "bus-1",
+    });
+
+    expect(update.tripId).toBe("T1");
+    expect(update.vehicleId).toBe("bus-1");
+    expect(update.stopTimeUpdates.map((stop) => stop.stopId)).toEqual(["S2", "S3"]);
+    expect(update.stopTimeUpdates[0]?.departureDelay).toBe(90);
+  });
+
   it("未知tripや静的GTFSにない停留所を拒否する", () => {
     const index = buildRealtimeTripIndex(sampleFeed());
 
@@ -59,5 +108,14 @@ describe("GTFS-RT TripUpdates static index", () => {
     expect(() => tripDelayToTripUpdate(index, { tripId: "T1", delaySec: 60, fromStopId: "NOPE" })).toThrow(
       /stop_id/,
     );
+    expect(() => findRealtimeTripCandidates(index, { routeId: "R1", atTime: "bad" })).toThrow(/atTime/);
+    expect(() =>
+      matchedTripDelayToTripUpdate(index, {
+        routeId: "R1",
+        atTime: "12:00:00",
+        maxTimeDiffSec: 60,
+        delaySec: 60,
+      }),
+    ).toThrow(/no trip candidate/);
   });
 });

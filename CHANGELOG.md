@@ -20,6 +20,10 @@ GTFS-JP v4 golden sample回帰を追加した。
   `trips.txt` / `stop_times.txt` から trip_id / route_id / stop_sequence を引ける
   `buildRealtimeTripIndex` を作り、trip_id基準の遅延を `tripDelayToTripUpdate` で
   StopTimeUpdateへ展開できる。
+- **TripUpdates用の候補trip抽出を追加**。
+  `findRealtimeTripCandidates` で route_id、時刻、任意の service_id / direction_id /
+  stop_id から近い静的trip候補を返し、`matchedTripDelayToTripUpdate` で最も近い候補を
+  遅延TripUpdateへ展開できる。
 - **GTFS-JP v4 golden sampleテストを追加**。
   minimal-fixed-bus、overnight-bus、calendar-dates-only、translations-kana、
   shape-basic、v4出力後の再検証を内部validator error 0で確認する。
@@ -37,11 +41,11 @@ GTFS-JP v4 golden sample回帰を追加した。
 ### テスト
 
 - core `test/realtime.test.ts` にTripUpdates 3件、
-  `test/realtime-trip-index.test.ts` にTripUpdates静的index 4件、
+  `test/realtime-trip-index.test.ts` にTripUpdates静的index・候補抽出 7件、
   `test/v4-golden-samples.test.ts` にV4 golden 6件を追加。
 - api `test/rt-relay.test.ts` にVehiclePositions認証/レート制限 2件、
   TripUpdates API 2件を追加。
-- 2026-06-30時点で core 111件、api 24件 pass。
+- 2026-06-30時点で core 114件、api 24件 pass。
 
 ## Unreleased — Web トップをモード選択ランディング化
 

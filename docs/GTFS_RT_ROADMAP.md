@@ -30,7 +30,7 @@
 | RT-1 | ServiceAlerts最小実装 | 手動Alert入力モデル、protobuf生成、HTTP配信 | ✅ core store＋API pb配信完了 / Webはローカル保存 |
 | RT-2 | 外部GTFS-RT中継 | 既存 `.pb` の取得、検証、キャッシュ、再配信 | ✅ core relay＋api poller/配信完了 |
 | RT-3 | VehiclePositions取込 | GPS/外部JSON入力、車両位置Feed生成 | ⏳ core store＋API配信・認証MVP完了 / 地図表示未実装 |
-| RT-4 | TripUpdates生成 | 静的GTFSとの突合、遅延算出、StopTimeUpdate生成 | ⏳ core store＋API配信＋静的index MVP完了 / trip推定未実装 |
+| RT-4 | TripUpdates生成 | 静的GTFSとの突合、遅延算出、StopTimeUpdate生成 | ⏳ core store＋API配信＋静的index・trip候補MVP完了 / 車両位置連動未実装 |
 | RT-5 | 運用品質 | 監視、鮮度SLO、公開URL検証、Google申請前チェック | ⏳ 未着手 |
 
 ## 3. 実装タスク管理
@@ -73,7 +73,7 @@
 | ID | タスク | 受入基準 | 状態 |
 |----|--------|----------|------|
 | RT-4-1 | 静的GTFS index | service_id/trip_id/route_id/stop_timesを高速参照できる | ✅ core MVP |
-| RT-4-2 | tripマッチング | route/運用番号/時刻/位置から候補tripを推定できる | ⏳ |
+| RT-4-2 | tripマッチング | route/運用番号/時刻/位置から候補tripを推定できる | ⏳ route/time/stop候補MVP完了 / 運用番号・位置未 |
 | RT-4-3 | stop進捗推定 | 現在/次停留所と遅延秒を算出できる | ⏳ |
 | RT-4-4 | StopTimeUpdate生成 | arrival/departure delay/timeを出力できる | ✅ core/API MVP |
 | RT-4-5 | 運休・途中打切 | schedule_relationshipを仕様版に従って表現 | ✅ core/API MVP |
@@ -122,3 +122,4 @@
 7. 外部GTFS-RT中継のsourceモデルとpoller設計へ進む。 ✅ RT-2完了
 8. TripUpdatesの手動/外部入力MVPを追加し、`GET /rt/trip-updates.pb` で配信する。 ✅
 9. 静的GTFSの `trips.txt` / `stop_times.txt` からTripUpdates用indexを作り、trip_id基準の遅延をStopTimeUpdateへ展開する。 ✅
+10. route_id・時刻・任意stop_idからTripUpdates用の候補tripを近い順に抽出する。 ✅
