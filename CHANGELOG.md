@@ -3,6 +3,41 @@
 GTFS Studio（西沢ツールWEB版）の段階的実装の記録。仕様書（`docs/spec/`）に追従し、
 `packages/core` の取込・検証・移行・出力を一歩ずつ確実にしていく。
 
+## Unreleased — GTFS-RT VehiclePositions認証・TripUpdates MVP / V4 golden samples
+
+GTFS-RTの書き込み系を運用に寄せ、TripUpdatesの最小生成・配信と
+GTFS-JP v4 golden sample回帰を追加した。
+
+### 追加（core）
+
+- **TripUpdates builder/storeを追加**（`packages/core/src/realtime.ts`）。
+  `TripUpdateInput` からGTFS-RT `FeedMessage` を生成し、StopTimeUpdateの
+  arrival/departure delay/time、trip/stopの schedule_relationship をprotobuf化できる。
+- **TripUpdatesの保存ストアを追加**。
+  `createRealtimeTripUpdateStore` で最新TripUpdateを保持し、`encodeTripUpdatesFeed`
+  で `.pb` 配信に使えるバイト列を生成する。
+- **GTFS-JP v4 golden sampleテストを追加**。
+  minimal-fixed-bus、overnight-bus、calendar-dates-only、translations-kana、
+  shape-basic、v4出力後の再検証を内部validator error 0で確認する。
+
+### 追加（api）
+
+- **VehiclePositions書き込み認証・レート制限**。
+  `rtVehicleTokens` 設定時のみ、`POST/PUT/DELETE /rt/vehicles` に
+  `Authorization: Bearer ...` または `x-rt-source-token` を要求する。
+  既定レート制限は token 単位で 60 requests / 60s。
+- **TripUpdates CRUD/pb配信API**。
+  `GET/POST /rt/trip-updates`、`GET/PUT/DELETE /rt/trip-updates/:id`、
+  `GET /rt/trip-updates.pb` を追加した。
+
+### テスト
+
+- core `test/realtime.test.ts` にTripUpdates 3件、
+  `test/v4-golden-samples.test.ts` にV4 golden 6件を追加。
+- api `test/rt-relay.test.ts` にVehiclePositions認証/レート制限 2件、
+  TripUpdates API 2件を追加。
+- 2026-06-30時点で core 107件、api 24件 pass。
+
 ## Unreleased — Web トップをモード選択ランディング化
 
 トップ画面を「作業モードの選択だけ」に変更し、選んだ先で画面全体を切り替えるようにした。

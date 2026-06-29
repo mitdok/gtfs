@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   buildServiceAlertsFeed,
+  buildTripUpdatesFeed,
   buildVehiclePositionsFeed,
   createRealtimeAlertStore,
+  createRealtimeTripUpdateStore,
   createRealtimeVehicleStore,
   decodeRealtimeFeed,
   encodeServiceAlertsFeed,
+  encodeTripUpdatesFeed,
   encodeVehiclePositionsFeed,
   realtimeFeedToObject,
 } from "../src/realtime.js";
@@ -216,5 +219,80 @@ describe("GTFS-RT VehiclePositions", () => {
     expect(store.get("veh-1")?.updatedAt).toBe("2026-06-16T00:00:30.000Z");
     const feed = decodeRealtimeFeed(store.encode({ timestamp: "2026-06-16T00:01:00Z" }));
     expect(feed.entity.map((entity) => entity.vehicle?.vehicle?.id)).toEqual(["bus-1", "bus-2"]);
+  });
+});
+
+describe("GTFS-RT TripUpdates", () => {
+  it("TripUpdate入力からFeedMessage protobufを生成してdecodeできる", () => {
+    const bytes = encodeTripUpdatesFeed(
+      [
+        {
+          id: "tu-entity-1",
+          tripId: "T1",
+          routeId: "R1",
+          startDate: "20260616",
+          vehicleId: "bus-101",
+          timestamp: "2026-06-16T00:01:00Z",
+          stopTimeUpdates: [
+            { stopSequence: 1, stopId: "S1", departureDelay: 60 },
+            { stopSequence: 2, stopId: "S2", arrivalTime: "2026-06-16T00:06:00Z" },
+          ],
+        },
+      ],
+      { timestamp: "2026-06-16T00:01:10Z", feedVersion: "tu-test-1" },
+    );
+
+    const feed = decodeRealtimeFeed(bytes);
+    expect(feed.header.gtfsRealtimeVersion).toBe("2.0");
+    expect(feed.header.feedVersion).toBe("tu-test-1");
+    expect(feed.entity[0]?.tripUpdate?.trip?.tripId).toBe("T1");
+    expect(feed.entity[0]?.tripUpdate?.vehicle?.id).toBe("bus-101");
+    expect(feed.entity[0]?.tripUpdate?.stopTimeUpdate?.[0]?.departure?.delay).toBe(60);
+    expect(Number(feed.entity[0]?.tripUpdate?.stopTimeUpdate?.[1]?.arrival?.time)).toBe(1781568360);
+    expect(Number(feed.entity[0]?.tripUpdate?.timestamp)).toBe(1781568060);
+  });
+
+  it("trip_id と stop_time_update の不正値を拒否する", () => {
+    expect(() =>
+      buildTripUpdatesFeed([{ id: "bad", tripId: "", stopTimeUpdates: [{ stopSequence: 1 }] }]),
+    ).toThrow(/tripId/);
+    expect(() => buildTripUpdatesFeed([{ id: "bad", tripId: "T1", stopTimeUpdates: [] }])).toThrow(
+      /stopTimeUpdate/,
+    );
+    expect(() =>
+      buildTripUpdatesFeed([{ id: "bad", tripId: "T1", stopTimeUpdates: [{ stopSequence: 0 }] }]),
+    ).toThrow(/stopSequence/);
+    expect(() =>
+      buildTripUpdatesFeed([{ id: "bad", tripId: "T1", stopTimeUpdates: [{ departureDelay: 30 }] }]),
+    ).toThrow(/stopSequence or stopId/);
+  });
+
+  it("TripUpdateストアで最新遅延を保持しFeed化できる", () => {
+    const store = createRealtimeTripUpdateStore();
+    store.upsert(
+      {
+        id: "tu-1",
+        tripId: "T1",
+        routeId: "R1",
+        timestamp: "2026-06-16T00:01:00Z",
+        stopTimeUpdates: [{ stopSequence: 1, stopId: "S1", departureDelay: 90 }],
+      },
+      "2026-06-16T00:01:10Z",
+    );
+    store.upsert(
+      {
+        id: "tu-2",
+        tripId: "T2",
+        routeId: "R1",
+        stopTimeUpdates: [{ stopSequence: 1, stopId: "S1", scheduleRelationship: "SKIPPED" }],
+      },
+      "2026-06-16T00:02:00Z",
+    );
+
+    expect(store.list().map((update) => update.id)).toEqual(["tu-1", "tu-2"]);
+    expect(store.get("tu-1")?.updatedAt).toBe("2026-06-16T00:01:00.000Z");
+    const feed = decodeRealtimeFeed(store.encode({ timestamp: "2026-06-16T00:02:00Z" }));
+    expect(feed.entity.map((entity) => entity.tripUpdate?.trip?.tripId)).toEqual(["T1", "T2"]);
+    expect(feed.entity[1]?.tripUpdate?.stopTimeUpdate?.[0]?.scheduleRelationship).toBe(1);
   });
 });

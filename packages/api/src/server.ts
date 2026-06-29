@@ -16,8 +16,10 @@ import {
 import type { RtSource } from "@gtfs-studio/core/realtime";
 import type {
   RealtimeAlertStore,
+  RealtimeTripUpdateStore,
   RealtimeVehicleStore,
   ServiceAlertInput,
+  TripUpdateInput,
   VehiclePositionInput,
 } from "@gtfs-studio/core/realtime";
 import type { SpecLockRepository } from "./spec-lock-repository.js";
@@ -40,8 +42,20 @@ export interface ApiOptions {
   rtAlerts?: RealtimeAlertStore;
   /** VehiclePositions保存・配信用ストア（未指定なら /rt/vehicles 系は 501）。 */
   rtVehicles?: RealtimeVehicleStore;
+  /** TripUpdates保存・配信用ストア（未指定なら /rt/trip-updates 系は 501）。 */
+  rtTripUpdates?: RealtimeTripUpdateStore;
   /** `.pb` 再配信時の age 算定基準（Unix秒）。テスト用。既定は実時刻。 */
   rtNow?: () => number;
+  /**
+   * VehiclePositions書き込み用source token。
+   * 未指定または空配列なら互換性のため認証しない。
+   */
+  rtVehicleTokens?: string[];
+  /**
+   * VehiclePositions書き込み用のtoken単位レート制限。
+   * 既定は 60 requests / 60s。token認証が無効な場合は適用しない。
+   */
+  rtVehicleRateLimit?: { windowMs: number; max: number };
 }
 
 function sendJson(res: ServerResponse, status: number, body: unknown) {
@@ -81,6 +95,11 @@ function readJsonBody(req: IncomingMessage): Promise<unknown> {
   });
 }
 
+function extractBearer(auth: string | undefined): string | undefined {
+  const match = auth?.match(/^Bearer\s+(.+)$/i);
+  return match?.[1]?.trim();
+}
+
 /** 検収リクエストの本体。 */
 interface AcceptanceRequest {
   zipBase64?: string;
@@ -96,6 +115,9 @@ interface AcceptanceRequest {
 export function createApiServer(options: ApiOptions): Server {
   const { repository } = options;
   const now = options.now ?? (() => new Date().toISOString());
+  const rtVehicleTokens = new Set((options.rtVehicleTokens ?? []).filter((token) => token.trim() !== ""));
+  const rtVehicleRateLimit = options.rtVehicleRateLimit ?? { windowMs: 60_000, max: 60 };
+  const rtVehicleRateBuckets = new Map<string, number[]>();
 
   return createServer((req, res) => {
     void handle(req, res).catch((e) => {
@@ -225,6 +247,8 @@ export function createApiServer(options: ApiOptions): Server {
         if (!store) return sendJson(res, 501, { error: "rt vehicles are not configured" });
         if (method === "GET") return sendJson(res, 200, { vehicles: store.list() });
         if (method === "POST") {
+          const auth = authorizeRtVehicleWrite(req);
+          if (!auth.ok) return sendJson(res, auth.status, { error: auth.error });
           const body = (await readJsonBody(req)) as Partial<VehiclePositionInput>;
           if (!body.id) return sendJson(res, 400, { error: "id is required" });
           const stored = store.upsert(body as VehiclePositionInput, rtNow());
@@ -251,8 +275,53 @@ export function createApiServer(options: ApiOptions): Server {
           return vehicle ? sendJson(res, 200, vehicle) : sendJson(res, 404, { error: "not found" });
         }
         if (method === "PUT") {
+          const auth = authorizeRtVehicleWrite(req);
+          if (!auth.ok) return sendJson(res, auth.status, { error: auth.error });
           const body = (await readJsonBody(req)) as Partial<VehiclePositionInput>;
           const stored = store.upsert({ ...(body as VehiclePositionInput), id }, rtNow());
+          return sendJson(res, 200, stored);
+        }
+        if (method === "DELETE") {
+          const auth = authorizeRtVehicleWrite(req);
+          if (!auth.ok) return sendJson(res, auth.status, { error: auth.error });
+          return sendJson(res, 200, { removed: store.remove(id) });
+        }
+        return sendJson(res, 405, { error: "method not allowed" });
+      }
+
+      if (path === "/rt/trip-updates") {
+        const store = options.rtTripUpdates;
+        if (!store) return sendJson(res, 501, { error: "rt trip updates are not configured" });
+        if (method === "GET") return sendJson(res, 200, { tripUpdates: store.list() });
+        if (method === "POST") {
+          const body = (await readJsonBody(req)) as Partial<TripUpdateInput>;
+          if (!body.id) return sendJson(res, 400, { error: "id is required" });
+          const stored = store.upsert(body as TripUpdateInput, rtNow());
+          return sendJson(res, 200, stored);
+        }
+        return sendJson(res, 405, { error: "method not allowed" });
+      }
+
+      if (path === "/rt/trip-updates.pb" && method === "GET") {
+        const store = options.rtTripUpdates;
+        if (!store) return sendJson(res, 501, { error: "rt trip updates are not configured" });
+        return sendBytes(res, 200, store.encode({ timestamp: rtNow() }), {
+          "cache-control": "no-cache",
+        });
+      }
+
+      const tripUpdateMatch = path.match(/^\/rt\/trip-updates\/([^/]+)$/);
+      if (tripUpdateMatch) {
+        const store = options.rtTripUpdates;
+        if (!store) return sendJson(res, 501, { error: "rt trip updates are not configured" });
+        const id = decodeURIComponent(tripUpdateMatch[1]!);
+        if (method === "GET") {
+          const update = store.get(id);
+          return update ? sendJson(res, 200, update) : sendJson(res, 404, { error: "not found" });
+        }
+        if (method === "PUT") {
+          const body = (await readJsonBody(req)) as Partial<TripUpdateInput>;
+          const stored = store.upsert({ ...(body as TripUpdateInput), id }, rtNow());
           return sendJson(res, 200, stored);
         }
         if (method === "DELETE") {
@@ -335,5 +404,32 @@ export function createApiServer(options: ApiOptions): Server {
     }
 
     return sendJson(res, 404, { error: `not found: ${method} ${path}` });
+  }
+
+  function authorizeRtVehicleWrite(req: IncomingMessage):
+    | { ok: true; token?: string }
+    | { ok: false; status: 401 | 429; error: string } {
+    if (rtVehicleTokens.size === 0) return { ok: true };
+
+    const token =
+      extractBearer(req.headers.authorization) ??
+      (Array.isArray(req.headers["x-rt-source-token"])
+        ? req.headers["x-rt-source-token"][0]
+        : req.headers["x-rt-source-token"]);
+
+    if (!token || !rtVehicleTokens.has(token)) {
+      return { ok: false, status: 401, error: "invalid or missing rt vehicle token" };
+    }
+
+    const nowMs = Date.now();
+    const since = nowMs - rtVehicleRateLimit.windowMs;
+    const kept = (rtVehicleRateBuckets.get(token) ?? []).filter((t) => t > since);
+    if (kept.length >= rtVehicleRateLimit.max) {
+      rtVehicleRateBuckets.set(token, kept);
+      return { ok: false, status: 429, error: "rt vehicle rate limit exceeded" };
+    }
+    kept.push(nowMs);
+    rtVehicleRateBuckets.set(token, kept);
+    return { ok: true, token };
   }
 }

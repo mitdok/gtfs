@@ -3,6 +3,7 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import {
   createRealtimeAlertStore,
+  createRealtimeTripUpdateStore,
   createRealtimeVehicleStore,
   decodeRealtimeFeed,
   encodeServiceAlertsFeed,
@@ -83,7 +84,7 @@ describe("RT-2 poller（fetch注入）", () => {
 });
 
 describe("RT-2 中継エンドポイント", () => {
-  let server: Server;
+  let server: Server | undefined;
   let base: string;
 
   beforeEach(async () => {
@@ -184,7 +185,8 @@ describe("RT-1 手動ServiceAlerts API", () => {
     });
   });
   afterEach(async () => {
-    await new Promise<void>((r) => server.close(() => r()));
+    if (server) await new Promise<void>((r) => server.close(() => r()));
+    server = undefined;
   });
 
   it("Alertを登録・取得・protobuf配信できる", async () => {
@@ -236,8 +238,23 @@ describe("RT-1 手動ServiceAlerts API", () => {
 });
 
 describe("RT-3 VehiclePositions API", () => {
-  let server: Server;
+  let server: Server | undefined;
   let base: string;
+
+  async function listen(serverToListen: Server): Promise<string> {
+    return await new Promise((resolve) => {
+      serverToListen.listen(0, "127.0.0.1", () => {
+        const { port } = serverToListen.address() as AddressInfo;
+        resolve(`http://127.0.0.1:${port}`);
+      });
+    });
+  }
+
+  async function restart(options: Parameters<typeof createApiServer>[0]) {
+    if (server) await new Promise<void>((r) => server.close(() => r()));
+    server = createApiServer(options);
+    base = await listen(server);
+  }
 
   beforeEach(async () => {
     const repository = openSpecLockRepository("/tmp/__rt_vehicle_locks_unused.json");
@@ -246,15 +263,11 @@ describe("RT-3 VehiclePositions API", () => {
       rtVehicles: createRealtimeVehicleStore(),
       rtNow: () => 1_781_568_000,
     });
-    base = await new Promise((resolve) => {
-      server.listen(0, "127.0.0.1", () => {
-        const { port } = server.address() as AddressInfo;
-        resolve(`http://127.0.0.1:${port}`);
-      });
-    });
+    base = await listen(server);
   });
   afterEach(async () => {
-    await new Promise<void>((r) => server.close(() => r()));
+    if (server) await new Promise<void>((r) => server!.close(() => r()));
+    server = undefined;
   });
 
   it("VehiclePositionを登録・取得・protobuf配信できる", async () => {
@@ -304,5 +317,128 @@ describe("RT-3 VehiclePositions API", () => {
     const del = await fetch(`${base}/rt/vehicles/veh-2`, { method: "DELETE" });
     expect((await del.json()).removed).toBe(true);
     expect((await fetch(`${base}/rt/vehicles/veh-2`)).status).toBe(404);
+  });
+
+  it("source token設定時はVehiclePosition書き込みを認証する", async () => {
+    const repository = openSpecLockRepository("/tmp/__rt_vehicle_auth_locks_unused.json");
+    await restart({
+      repository,
+      rtVehicles: createRealtimeVehicleStore(),
+      rtVehicleTokens: ["source-token"],
+      rtNow: () => 1_781_568_000,
+    });
+
+    const missing = await fetch(`${base}/rt/vehicles`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "veh-auth", vehicleId: "bus-auth", latitude: 34.7, longitude: 137.3 }),
+    });
+    expect(missing.status).toBe(401);
+
+    const authorized = await fetch(`${base}/rt/vehicles`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer source-token" },
+      body: JSON.stringify({ id: "veh-auth", vehicleId: "bus-auth", latitude: 34.7, longitude: 137.3 }),
+    });
+    expect(authorized.status).toBe(200);
+    expect((await fetch(`${base}/rt/vehicles`)).status).toBe(200);
+  });
+
+  it("VehiclePosition書き込みをsource token単位でレート制限する", async () => {
+    const repository = openSpecLockRepository("/tmp/__rt_vehicle_rate_locks_unused.json");
+    await restart({
+      repository,
+      rtVehicles: createRealtimeVehicleStore(),
+      rtVehicleTokens: ["rate-token"],
+      rtVehicleRateLimit: { windowMs: 60_000, max: 1 },
+      rtNow: () => 1_781_568_000,
+    });
+
+    const first = await fetch(`${base}/rt/vehicles/veh-rate`, {
+      method: "PUT",
+      headers: { "content-type": "application/json", "x-rt-source-token": "rate-token" },
+      body: JSON.stringify({ vehicleId: "bus-rate", latitude: 34.7, longitude: 137.3 }),
+    });
+    expect(first.status).toBe(200);
+
+    const second = await fetch(`${base}/rt/vehicles/veh-rate`, {
+      method: "DELETE",
+      headers: { "x-rt-source-token": "rate-token" },
+    });
+    expect(second.status).toBe(429);
+
+    const read = await fetch(`${base}/rt/vehicles/veh-rate`);
+    expect(read.status).toBe(200);
+  });
+});
+
+describe("RT-4 TripUpdates API", () => {
+  let server: Server;
+  let base: string;
+
+  beforeEach(async () => {
+    const repository = openSpecLockRepository("/tmp/__rt_trip_update_locks_unused.json");
+    server = createApiServer({
+      repository,
+      rtTripUpdates: createRealtimeTripUpdateStore(),
+      rtNow: () => 1_781_568_000,
+    });
+    base = await new Promise((resolve) => {
+      server.listen(0, "127.0.0.1", () => {
+        const { port } = server.address() as AddressInfo;
+        resolve(`http://127.0.0.1:${port}`);
+      });
+    });
+  });
+  afterEach(async () => {
+    await new Promise<void>((r) => server.close(() => r()));
+  });
+
+  it("TripUpdateを登録・取得・protobuf配信できる", async () => {
+    const post = await fetch(`${base}/rt/trip-updates`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        id: "tu-1",
+        tripId: "T1",
+        routeId: "R1",
+        vehicleId: "bus-1",
+        stopTimeUpdates: [{ stopSequence: 1, stopId: "S1", departureDelay: 120 }],
+      }),
+    });
+    expect(post.status).toBe(200);
+    expect((await post.json()).tripId).toBe("T1");
+
+    const list = await fetch(`${base}/rt/trip-updates`);
+    expect((await list.json()).tripUpdates.map((u: { id: string }) => u.id)).toEqual(["tu-1"]);
+
+    const pb = await fetch(`${base}/rt/trip-updates.pb`);
+    expect(pb.status).toBe(200);
+    expect(pb.headers.get("content-type")).toContain("x-protobuf");
+    const feed = decodeRealtimeFeed(new Uint8Array(await pb.arrayBuffer()));
+    expect(feed.entity[0]?.id).toBe("tu-1");
+    expect(feed.entity[0]?.tripUpdate?.trip?.tripId).toBe("T1");
+    expect(feed.entity[0]?.tripUpdate?.stopTimeUpdate?.[0]?.departure?.delay).toBe(120);
+  });
+
+  it("PUT/DELETEでTripUpdateを更新・削除できる", async () => {
+    const put = await fetch(`${base}/rt/trip-updates/tu-2`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        tripId: "T2",
+        routeId: "R1",
+        stopTimeUpdates: [{ stopSequence: 2, stopId: "S2", arrivalDelay: 60 }],
+      }),
+    });
+    expect(put.status).toBe(200);
+    expect((await put.json()).id).toBe("tu-2");
+
+    const get = await fetch(`${base}/rt/trip-updates/tu-2`);
+    expect((await get.json()).stopTimeUpdates[0].arrivalDelay).toBe(60);
+
+    const del = await fetch(`${base}/rt/trip-updates/tu-2`, { method: "DELETE" });
+    expect((await del.json()).removed).toBe(true);
+    expect((await fetch(`${base}/rt/trip-updates/tu-2`)).status).toBe(404);
   });
 });

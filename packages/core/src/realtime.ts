@@ -16,6 +16,8 @@ const { transit_realtime: rt } = gtfsRealtimeBindings;
 export type RealtimeAlertCause = keyof typeof rt.Alert.Cause;
 export type RealtimeAlertEffect = keyof typeof rt.Alert.Effect;
 export type RealtimeAlertSeverity = keyof typeof rt.Alert.SeverityLevel;
+export type TripScheduleRelationship = keyof typeof rt.TripDescriptor.ScheduleRelationship;
+export type StopTimeScheduleRelationship = keyof typeof rt.TripUpdate.StopTimeUpdate.ScheduleRelationship;
 
 export interface RealtimeText {
   /** BCP 47言語コード（例: ja, en）。 */
@@ -114,6 +116,50 @@ export interface BuildVehiclePositionsOptions {
   gtfsRealtimeVersion?: string;
 }
 
+export interface StopTimeUpdateInput {
+  stopSequence?: number;
+  stopId?: string;
+  arrivalDelay?: number;
+  arrivalTime?: number | Date | string;
+  departureDelay?: number;
+  departureTime?: number | Date | string;
+  scheduleRelationship?: StopTimeScheduleRelationship;
+}
+
+export interface TripUpdateInput {
+  id: string;
+  tripId: string;
+  routeId?: string;
+  startTime?: string;
+  startDate?: string;
+  scheduleRelationship?: TripScheduleRelationship;
+  vehicleId?: string;
+  vehicleLabel?: string;
+  vehicleLicensePlate?: string;
+  timestamp?: number | Date | string;
+  stopTimeUpdates: StopTimeUpdateInput[];
+}
+
+export interface StoredTripUpdate extends TripUpdateInput {
+  updatedAt: string;
+  receivedAt: string;
+}
+
+export interface RealtimeTripUpdateStore {
+  list(): StoredTripUpdate[];
+  get(id: string): StoredTripUpdate | undefined;
+  upsert(update: TripUpdateInput, now?: number | Date | string): StoredTripUpdate;
+  remove(id: string): boolean;
+  clear(): void;
+  encode(options?: BuildTripUpdatesOptions): Uint8Array;
+}
+
+export interface BuildTripUpdatesOptions {
+  timestamp?: number | Date | string;
+  feedVersion?: string;
+  gtfsRealtimeVersion?: string;
+}
+
 export function buildServiceAlertsFeed(
   alerts: ServiceAlertInput[],
   options: BuildServiceAlertsOptions = {},
@@ -165,6 +211,32 @@ export function encodeVehiclePositionsFeed(
   options: BuildVehiclePositionsOptions = {},
 ): Uint8Array {
   return rt.FeedMessage.encode(buildVehiclePositionsFeed(vehicles, options)).finish();
+}
+
+export function buildTripUpdatesFeed(
+  updates: TripUpdateInput[],
+  options: BuildTripUpdatesOptions = {},
+): transit_realtime.IFeedMessage {
+  const timestamp = toUnixSeconds(options.timestamp ?? new Date(), "timestamp");
+  const feed: transit_realtime.IFeedMessage = {
+    header: {
+      gtfsRealtimeVersion: options.gtfsRealtimeVersion ?? "2.0",
+      incrementality: rt.FeedHeader.Incrementality.FULL_DATASET,
+      timestamp,
+      ...(options.feedVersion ? { feedVersion: options.feedVersion } : {}),
+    },
+    entity: updates.map((update) => buildTripUpdateEntity(update, timestamp)),
+  };
+  const reason = rt.FeedMessage.verify(feed as unknown as Record<string, unknown>);
+  if (reason) throw new Error(`invalid GTFS-RT FeedMessage: ${reason}`);
+  return feed;
+}
+
+export function encodeTripUpdatesFeed(
+  updates: TripUpdateInput[],
+  options: BuildTripUpdatesOptions = {},
+): Uint8Array {
+  return rt.FeedMessage.encode(buildTripUpdatesFeed(updates, options)).finish();
 }
 
 export function decodeRealtimeFeed(bytes: Uint8Array): transit_realtime.FeedMessage {
@@ -260,6 +332,42 @@ export function createRealtimeVehicleStore(initialVehicles: VehiclePositionInput
   return store;
 }
 
+export function createRealtimeTripUpdateStore(initialUpdates: TripUpdateInput[] = []): RealtimeTripUpdateStore {
+  const updates = new Map<string, StoredTripUpdate>();
+  const store: RealtimeTripUpdateStore = {
+    list() {
+      return [...updates.values()].map(cloneStoredTripUpdate).sort((a, b) => a.id.localeCompare(b.id));
+    },
+    get(id: string) {
+      const update = updates.get(id);
+      return update ? cloneStoredTripUpdate(update) : undefined;
+    },
+    upsert(update, now = new Date()) {
+      buildTripUpdatesFeed([update], { timestamp: now });
+      const receivedAt = new Date(toUnixSeconds(now, "now") * 1000).toISOString();
+      const updatedAt = new Date(toUnixSeconds(update.timestamp ?? now, "tripUpdate.timestamp") * 1000).toISOString();
+      const stored: StoredTripUpdate = {
+        ...cloneTripUpdateInput(update),
+        receivedAt,
+        updatedAt,
+      };
+      updates.set(stored.id, stored);
+      return cloneStoredTripUpdate(stored);
+    },
+    remove(id: string) {
+      return updates.delete(id);
+    },
+    clear() {
+      updates.clear();
+    },
+    encode(options = {}) {
+      return encodeTripUpdatesFeed(this.list(), options);
+    },
+  };
+  for (const update of initialUpdates) store.upsert(update);
+  return store;
+}
+
 function buildAlertEntity(alert: ServiceAlertInput): transit_realtime.IFeedEntity {
   if (alert.id.trim() === "") throw new Error("ServiceAlertInput.id is required");
   if (alert.informedEntities.length === 0) {
@@ -341,6 +449,80 @@ function buildVehicleEntity(vehicle: VehiclePositionInput, feedTimestamp: number
   };
 }
 
+function buildTripUpdateEntity(update: TripUpdateInput, feedTimestamp: number): transit_realtime.IFeedEntity {
+  const id = update.id.trim();
+  if (id === "") throw new Error("TripUpdateInput.id is required");
+  const tripId = update.tripId.trim();
+  if (tripId === "") throw new Error(`trip update "${id}" tripId is required`);
+  if (update.stopTimeUpdates.length === 0) {
+    throw new Error(`trip update "${id}" must include at least one stopTimeUpdate`);
+  }
+  const timestamp =
+    update.timestamp === undefined ? feedTimestamp : toUnixSeconds(update.timestamp, "tripUpdate.timestamp");
+  return {
+    id,
+    tripUpdate: {
+      trip: {
+        tripId,
+        ...(update.routeId ? { routeId: update.routeId } : {}),
+        ...(update.startTime ? { startTime: update.startTime } : {}),
+        ...(update.startDate ? { startDate: update.startDate } : {}),
+        scheduleRelationship: rt.TripDescriptor.ScheduleRelationship[update.scheduleRelationship ?? "SCHEDULED"],
+      },
+      ...(update.vehicleId
+        ? {
+            vehicle: {
+              id: update.vehicleId,
+              ...(update.vehicleLabel ? { label: update.vehicleLabel } : {}),
+              ...(update.vehicleLicensePlate ? { licensePlate: update.vehicleLicensePlate } : {}),
+            },
+          }
+        : {}),
+      stopTimeUpdate: update.stopTimeUpdates.map((stop, index) => buildStopTimeUpdate(id, stop, index)),
+      timestamp,
+    },
+  };
+}
+
+function buildStopTimeUpdate(
+  tripUpdateId: string,
+  stop: StopTimeUpdateInput,
+  index: number,
+): transit_realtime.TripUpdate.IStopTimeUpdate {
+  if (stop.stopSequence === undefined && !stop.stopId) {
+    throw new Error(`trip update "${tripUpdateId}" stopTimeUpdate[${index}] needs stopSequence or stopId`);
+  }
+  if (stop.stopSequence !== undefined && (!Number.isInteger(stop.stopSequence) || stop.stopSequence <= 0)) {
+    throw new Error(`trip update "${tripUpdateId}" stopSequence must be a positive integer`);
+  }
+  const out: transit_realtime.TripUpdate.IStopTimeUpdate = {
+    ...(stop.stopSequence !== undefined ? { stopSequence: stop.stopSequence } : {}),
+    ...(stop.stopId ? { stopId: stop.stopId } : {}),
+    scheduleRelationship:
+      rt.TripUpdate.StopTimeUpdate.ScheduleRelationship[stop.scheduleRelationship ?? "SCHEDULED"],
+  };
+  const arrival = stopEvent(stop.arrivalDelay, stop.arrivalTime, "arrival");
+  if (arrival) out.arrival = arrival;
+  const departure = stopEvent(stop.departureDelay, stop.departureTime, "departure");
+  if (departure) out.departure = departure;
+  return out;
+}
+
+function stopEvent(
+  delay: number | undefined,
+  time: number | Date | string | undefined,
+  label: string,
+): transit_realtime.TripUpdate.IStopTimeEvent | undefined {
+  if (delay === undefined && time === undefined) return undefined;
+  if (delay !== undefined && (!Number.isFinite(delay) || !Number.isInteger(delay))) {
+    throw new Error(`${label}.delay must be an integer number of seconds`);
+  }
+  return {
+    ...(delay !== undefined ? { delay } : {}),
+    ...(time !== undefined ? { time: toUnixSeconds(time, `${label}.time`) } : {}),
+  };
+}
+
 function isValidPosition(lat: number, lon: number): boolean {
   return (
     Number.isFinite(lat) &&
@@ -411,6 +593,30 @@ function cloneVehicleInput(vehicle: VehiclePositionInput): VehiclePositionInput 
     startTime: vehicle.startTime,
     startDate: vehicle.startDate,
     directionId: vehicle.directionId,
+  };
+}
+
+function cloneStoredTripUpdate(update: StoredTripUpdate): StoredTripUpdate {
+  return {
+    ...cloneTripUpdateInput(update),
+    updatedAt: update.updatedAt,
+    receivedAt: update.receivedAt,
+  };
+}
+
+function cloneTripUpdateInput(update: TripUpdateInput): TripUpdateInput {
+  return {
+    id: update.id,
+    tripId: update.tripId,
+    routeId: update.routeId,
+    startTime: update.startTime,
+    startDate: update.startDate,
+    scheduleRelationship: update.scheduleRelationship,
+    vehicleId: update.vehicleId,
+    vehicleLabel: update.vehicleLabel,
+    vehicleLicensePlate: update.vehicleLicensePlate,
+    timestamp: update.timestamp,
+    stopTimeUpdates: update.stopTimeUpdates.map((stop) => ({ ...stop })),
   };
 }
 

@@ -1,12 +1,12 @@
 # GTFS-JP v4対応ロードマップ・達成管理
 
-最終更新: 2026-06-29
+最終更新: 2026-06-30
 
 本書はGTFS StudioのGTFS-JP v4対応を、実装・検証・公開運用の観点で段階管理する。対象は固定路線バスの静的GTFS-JP v4 MVPであり、GTFS-RT、GTFS-Flex、Fares v2は別フェーズとして扱う。
 
 ## 1. 現在地
 
-総合進捗: **78%**
+総合進捗: **80%**
 
 内訳:
 
@@ -19,10 +19,10 @@
 | v4検証ルール | 18 | 16 | ✅ 中核 / 均一運賃以外の詳細・実データ精査不足 | `validator.ts` |
 | Google公開ゲート・公開可否判定 | 10 | 8 | ✅ 判定器＋Web表示 / 運用証跡不足 | `release-gate.ts`, `ReleaseGateView.tsx` |
 | 標準validator連携 | 10 | 7 | ✅ report取込＋CLI Java起動 / CI連携未完 | `standard-validator.ts`, `gtfs-acceptance.mjs` |
-| golden sample・実データ検収 | 10 | 3 | ⏳ 判定器あり / サンプル・実データ不足 | `acceptance.ts` |
+| golden sample・実データ検収 | 10 | 5 | ⏳ 内部goldenサンプル追加 / 標準validator・実データ不足 | `acceptance.ts`, `test/v4-golden-samples.test.ts` |
 | Web編集・出力ワークフロー | 7 | 7 | ✅ 新規作成＋路線/停留所/便追加MVP / 公開ワークフロー未完 | `packages/web` |
 | API・永続化・公開URL運用 | 5 | 3 | ✅ API＋ファイル永続化MVP / revision・publish未完 | `packages/api` |
-| **合計** | **100** | **78** |  |  |
+| **合計** | **100** | **80** |  |  |
 
 読み替え:
 
@@ -37,7 +37,7 @@
 | V4-1 | core入出力MVP | import/migrate/validate/export/filter | ✅ 完了 |
 | V4-2 | 実務検証強化 | v4条件付きルール、Google公開ゲート | ✅ MVP完了 |
 | V4-3 | 標準validator実行 | MobilityData validatorの実行・結果保存 | ✅ CLI MVP完了 |
-| V4-4 | golden sample・実データ回帰 | 最小/夜行/calendar_dates/shape/v3/実データ回帰 | ⏳ 次優先 |
+| V4-4 | golden sample・実データ回帰 | 最小/夜行/calendar_dates/shape/v3/実データ回帰 | ⏳ 内部サンプル一部完了 / 標準validator・実データ未完 |
 | V4-5 | Web公開ワークフロー | 公開ゲート、validator結果取込、検収結果表示 | ⏳ 一部完了 |
 | V4-6 | API・永続化・公開URL | spec lock保存、revision、publish、public URL smoke | ⏳ API MVP完了 |
 | V4-7 | 実務OK | 11章A-01〜A-10をCI/運用でpass | ⏳ 未達 |
@@ -91,11 +91,11 @@
 
 | ID | タスク | 受入基準 | 状態 |
 |----|--------|----------|------|
-| V4-4-1 | minimal-fixed-bus | v4 error 0、標準validator error 0 | ⏳ |
-| V4-4-2 | overnight-bus | 24時超時刻を標準validatorで確認 | ⏳ |
-| V4-4-3 | calendar-dates-only | calendarなしでもservice参照が成立 | ⏳ |
-| V4-4-4 | translations-kana | 読み仮名出力を確認 | ⏳ |
-| V4-4-5 | shape-basic | shapes/trips.shape_idを確認 | ⏳ |
+| V4-4-1 | minimal-fixed-bus | v4 error 0、標準validator error 0 | ⏳ 内部v4 error 0完了 / 標準validator未 |
+| V4-4-2 | overnight-bus | 24時超時刻を標準validatorで確認 | ⏳ 内部検証完了 / 標準validator未 |
+| V4-4-3 | calendar-dates-only | calendarなしでもservice参照が成立 | ✅ 内部検証 |
+| V4-4-4 | translations-kana | 読み仮名出力を確認 | ✅ 内部検証 |
+| V4-4-5 | shape-basic | shapes/trips.shape_idを確認 | ✅ 内部検証 |
 | V4-4-6 | legacy-v3-import | v3由来フィードをv4出力へ移行 | ⏳ |
 | V4-4-7 | real-feed-roundtrip-1 | 実フィード取込→再出力→標準validator error 0 | ⏳ |
 
