@@ -5,7 +5,7 @@
 
 - 最終更新: 2026-06-30
 - 対象コミット: 本ファイルと同一リビジョン
-- コア・テスト: 107 件 pass（`pnpm --filter @gtfs-studio/core test`）
+- コア・テスト: 111 件 pass（`pnpm --filter @gtfs-studio/core test`）
 - API・テスト: 24 件 pass（`pnpm --filter @gtfs-studio/api test`）
 
 ## 1. パイプライン全体
@@ -25,7 +25,7 @@
 | バックエンドAPI（仕様ロック永続化・検収HTTP） | `createApiServer` / `gtfs-api` | ✅ node:http・依存ゼロ | `packages/api/src/server.ts`, `api/bin/gtfs-api.mjs` |
 | GTFS-RT ServiceAlerts | `encodeServiceAlertsFeed` | ✅ core builder | `src/realtime.ts` |
 | GTFS-RT 外部中継（RT-2） | `createRtRelayService` / `validateRealtimeFeed` | ✅ poll・正規化・鮮度・再配信 | `core/src/realtime-relay.ts`, `api/src/rt-relay.ts` |
-| GTFS-RT TripUpdates | `encodeTripUpdatesFeed` / `createRealtimeTripUpdateStore` | ✅ core/API MVP | `core/src/realtime.ts`, `api/src/server.ts` |
+| GTFS-RT TripUpdates | `encodeTripUpdatesFeed` / `createRealtimeTripUpdateStore` / `buildRealtimeTripIndex` | ✅ core/API MVP＋静的index MVP | `core/src/realtime.ts`, `core/src/realtime-trip-index.ts`, `api/src/server.ts` |
 
 ## 2. プロファイル（仕様 10.1）
 
@@ -77,7 +77,7 @@
 
 ### ⏳ 未実装（残タスク）
 
-仕様ロックのDB永続化・認証、validator実体のCI連携、GTFS-RT TripUpdatesの静的GTFS突合・品質評価。
+仕様ロックのDB永続化・認証、validator実体のCI連携、GTFS-RT TripUpdatesのtrip推定・品質評価。
 
 ## 5. 仕様ロック・標準バリデータ連携・検収（仕様 10.2 / 10.7 / 10.9 / 10.10 / 11章）
 
@@ -108,7 +108,7 @@ GTFS-JP v4対応の詳細ロードマップと進捗率は
 3. ~~公開ゲートのWeb表示~~ … ✅ 完了（`web/components/ReleaseGateView.tsx`、公開ゲートタブ）。
 4. ~~検収パイプライン・CLI（11.4）／検収レポートのWeb表示~~ … ✅ 完了（`pipeline.ts` / `bin/gtfs-acceptance.mjs` / 公開ゲートにA-01〜A-10併載）。
 5. ~~仕様ロックの永続化・API層~~ … ✅ 完了（`packages/api`：node:http・依存ゼロ、ファイル永続化＋`POST /acceptance`）。
-6. （以降）仕様ロックの**DB永続化・認証**、validator実体のCI連携、GTFS-RT TripUpdatesの静的GTFS突合・品質評価。
+6. （以降）仕様ロックの**DB永続化・認証**、validator実体のCI連携、GTFS-RT TripUpdatesのtrip推定・品質評価。
 
 ## 7. GTFS-RT対応
 
@@ -121,7 +121,7 @@ GTFS-RTはフェーズ2以降の対象。ロードマップ、課題、達成管
 | RT-1 | ✅ core store＋API pb配信完了 / Webはローカル保存 | ServiceAlerts手動投入＋protobuf配信（`src/realtime.ts`, `api/server.ts`, `RealtimeAlertsView.tsx`） |
 | RT-2 | ✅ core relay＋api poller/配信 | 外部GTFS-RT中継・正規化（`realtime-relay.ts`, `api/rt-relay.ts`） |
 | RT-3 | ⏳ core store＋API pb配信・認証MVP完了 / 地図表示未実装 | VehiclePositions protobuf生成・最新位置保存・HTTP配信（`src/realtime.ts`, `api/server.ts`） |
-| RT-4 | ⏳ core store＋API pb配信MVP完了 / 静的GTFS突合未実装 | TripUpdates生成・静的GTFS突合 |
+| RT-4 | ⏳ core store＋API pb配信＋静的index MVP完了 / trip推定未実装 | TripUpdates生成・静的GTFS突合 |
 | RT-5 | ⏳ 未着手 | 鮮度SLO、監視、公開URL検証 |
 
 > 凡例: ✅ 実装済 / ⏳ 未実装・予定。
