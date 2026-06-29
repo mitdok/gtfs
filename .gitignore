@@ -8,4 +8,5 @@ coverage/
 .env.local
 
 gtfs-tmp/
+gtfs/
 tools/gtfs-validator.jar
