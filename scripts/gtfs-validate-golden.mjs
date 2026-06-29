@@ -12,12 +12,13 @@ import { basename, join, resolve } from "node:path";
 import { parseStandardValidatorReport } from "../packages/core/dist/index.js";
 
 function parseArgs(argv) {
-  const opts = { goldenDir: "gtfs-tmp/golden", reportsDir: "gtfs-tmp/golden-reports" };
+  const opts = { goldenDir: "gtfs-tmp/golden", reportsDir: "gtfs-tmp/golden-reports", verbose: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--validator-jar") opts.validatorJar = argv[++i];
     else if (a === "--golden-dir") opts.goldenDir = argv[++i];
     else if (a === "--reports-dir") opts.reportsDir = argv[++i];
+    else if (a === "--verbose") opts.verbose = true;
     else throw new Error(`unknown option: ${a}`);
   }
   return opts;
@@ -53,9 +54,14 @@ for (const zip of zips) {
   await rm(out, { recursive: true, force: true });
   await mkdir(out, { recursive: true });
   const run = spawnSync("java", ["-jar", validatorJar, "--input", zip.path, "--output_base", out], {
-    stdio: "inherit",
+    encoding: "utf8",
+    stdio: opts.verbose ? "inherit" : "pipe",
   });
   if (run.error || run.status !== 0) {
+    if (!opts.verbose) {
+      if (run.stdout) console.error(run.stdout);
+      if (run.stderr) console.error(run.stderr);
+    }
     throw new Error(`${zip.id}: validator failed (status=${run.status})`);
   }
   const reportPath = join(out, "report.json");

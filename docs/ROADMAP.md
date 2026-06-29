@@ -89,7 +89,7 @@
 
 | Step | 刻み | 完了条件 | 100%への寄与 |
 |------|------|----------|--------------|
-| S1 | validator jar固定 | validator jarの版・配置・Java条件を固定し、ローカルで再現可能 | ✅ MVP: `tools/gtfs-validator.jar` / `GTFS_VALIDATOR_JAR` を採用 |
+| S1 | validator jar固定 | validator jarの版・配置・Java条件を固定し、ローカルで再現可能 | ✅ MVP: `pnpm gtfs:validator:install` / `tools/gtfs-validator.jar` / `GTFS_VALIDATOR_JAR` を採用 |
 | S2 | `pnpm` 検収コマンド化 | `pnpm gtfs:validate` 等で内部検証＋標準validator＋検収を実行できる | ✅ MVP: `pnpm gtfs:validate <gtfs.zip>` を追加 |
 | S3 | v4 golden標準validator通過 | minimal / overnight / calendar_dates / translations / shape が標準validator error 0 | ✅ 完了: validator 8.0.1で5サンプル error 0（reportは `gtfs-tmp/golden-reports/`） |
 | S4 | 実データ回帰セット固定 | 実フィードまたは匿名化フィードを固定し、取込→再出力→検証が通る | 実務耐性の証跡 |

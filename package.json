@@ -8,6 +8,7 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "gtfs:validate": "node scripts/gtfs-validate.mjs",
+    "gtfs:validator:install": "node scripts/gtfs-validator-install.mjs",
     "gtfs:golden": "pnpm --filter @gtfs-studio/core build && node scripts/gtfs-golden-fixtures.mjs",
     "gtfs:validate-golden": "pnpm gtfs:golden && node scripts/gtfs-validate-golden.mjs"
   },

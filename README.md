@@ -35,15 +35,18 @@ pnpm -r test       # 全パッケージテスト
 ### 検収・標準validator
 
 ```bash
+pnpm gtfs:validator:install
 pnpm gtfs:validate path/to/gtfs.zip
 ```
 
-- MobilityData validator jar は `tools/gtfs-validator.jar` に置く。
+- `pnpm gtfs:validator:install` で MobilityData validator `8.0.1` を `tools/gtfs-validator.jar` に配置する。
 - 別パスを使う場合は `GTFS_VALIDATOR_JAR=/path/to/gtfs-validator.jar pnpm gtfs:validate path/to/gtfs.zip`。
 - 既存の `report.json` を使う場合は `pnpm gtfs:validate path/to/gtfs.zip --report report.json`。
 - `tools/gtfs-validator.jar` はGit管理外。
 - `pnpm gtfs:golden` で v4 golden sample zip を `gtfs-tmp/golden/` に生成できる。
 - `pnpm gtfs:validate-golden` で golden zip を生成し、標準validator reportを `gtfs-tmp/golden-reports/` に保存できる。
+- validatorの詳細ログを見たい場合は `node scripts/gtfs-validate-golden.mjs --verbose` を使う。
+- CIや新規環境では `pnpm gtfs:validator:install && pnpm gtfs:validate-golden` を実行する。
 
 ### packages/core
 

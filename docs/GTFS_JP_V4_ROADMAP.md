@@ -86,7 +86,7 @@
 | V4-3-1 | report.json取込 | MobilityData validator結果を集計できる | ✅ |
 | V4-3-2 | validator lock生成 | validator名・版をlock化できる | ✅ |
 | V4-3-3 | Java validator実行ラッパ | zipを渡してreport.jsonを生成できる | ✅ CLI |
-| V4-3-4 | CI/ローカルコマンド | `pnpm gtfs:validate` 相当で実行できる | ⏳ ローカルMVP完了 / CI未連携 |
+| V4-3-4 | CI/ローカルコマンド | `pnpm gtfs:validate` 相当で実行できる | ⏳ jar取得＋ローカルMVP完了 / CI未連携 |
 | V4-3-5 | Web validator結果取込 | report.jsonをUIから取り込み公開ゲートへ反映 | ✅ MVP |
 
 ### V4-4 golden sample・実データ回帰
