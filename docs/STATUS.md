@@ -92,6 +92,7 @@ GTFS-RT が [`GTFS_RT_ROADMAP.md`](./GTFS_RT_ROADMAP.md)。
 | core内の仕様ロック定義・公開可否判定 | ✅ MVP | `src/spec-lock.ts`, `src/release-gate.ts` |
 | MobilityData Validator レポート取込（10.7 step3） | ✅ `report.json` 取込・集計 | `src/standard-validator.ts` |
 | validator結果からの `VALIDATOR_LOCK` 生成（11.2） | ✅ | `src/standard-validator.ts` |
+| v4 golden sample標準validator回帰 | ✅ validator 8.0.1で5サンプル error 0 | `src/v4-golden-samples.ts`, `scripts/gtfs-validate-golden.mjs` |
 | 実データ検収 A-01〜A-10（11.1/11.5） | ✅ 判定器 | `src/acceptance.ts` |
 | プロファイル定義の外部データ化（10.11） | ✅ `src/profiles/*.json` 正本化 | `src/profile.ts`, `src/profile-schema.ts` |
 | 仕様ロックの保存・取得ストア（10.2） | ✅ インメモリ | `src/spec-lock.ts`（`createSpecLockStore`） |
@@ -114,7 +115,7 @@ GTFS-JP v4対応の詳細ロードマップと進捗率は
 3. ~~公開ゲートのWeb表示~~ … ✅ 完了（`web/components/ReleaseGateView.tsx`、公開ゲートタブ）。
 4. ~~検収パイプライン・CLI（11.4）／検収レポートのWeb表示~~ … ✅ 完了（`pipeline.ts` / `bin/gtfs-acceptance.mjs` / 公開ゲートにA-01〜A-10併載）。
 5. ~~仕様ロックの永続化・API層~~ … ✅ 完了（`packages/api`：node:http・依存ゼロ、ファイル永続化＋`POST /acceptance`）。
-6. （以降）仕様ロックの**DB永続化・認証**、validator実体のCI連携、GTFS-RT TripUpdatesの車両位置連動・実データ評価。
+6. （以降）実データ回帰セット固定、仕様ロックの**DB永続化・認証**、validator実体のCI連携、GTFS-RT TripUpdatesの車両位置連動・実データ評価。
 
 ## 7. GTFS-RT対応
 

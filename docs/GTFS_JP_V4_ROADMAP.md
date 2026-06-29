@@ -8,7 +8,7 @@
 
 ## 1. 現在地
 
-総合進捗: **80%**
+総合進捗: **82%**
 
 内訳:
 
@@ -21,14 +21,14 @@
 | v4検証ルール | 18 | 16 | ✅ 中核 / 均一運賃以外の詳細・実データ精査不足 | `validator.ts` |
 | Google公開ゲート・公開可否判定 | 10 | 8 | ✅ 判定器＋Web表示 / 運用証跡不足 | `release-gate.ts`, `ReleaseGateView.tsx` |
 | 標準validator連携 | 10 | 7 | ✅ report取込＋CLI Java起動 / CI連携未完 | `standard-validator.ts`, `gtfs-acceptance.mjs` |
-| golden sample・実データ検収 | 10 | 5 | ⏳ 内部goldenサンプル追加 / 標準validator・実データ不足 | `acceptance.ts`, `test/v4-golden-samples.test.ts` |
+| golden sample・実データ検収 | 10 | 7 | ⏳ golden標準validator error 0完了 / 実データ不足 | `acceptance.ts`, `v4-golden-samples.ts`, `gtfs-validate-golden.mjs` |
 | Web編集・出力ワークフロー | 7 | 7 | ✅ 新規作成＋路線/停留所/便追加MVP / 公開ワークフロー未完 | `packages/web` |
 | API・永続化・公開URL運用 | 5 | 3 | ✅ API＋ファイル永続化MVP / revision・publish未完 | `packages/api` |
-| **合計** | **100** | **80** |  |  |
+| **合計** | **100** | **82** |  |  |
 
 読み替え:
 
-- **coreライブラリとしてのv4対応**: 約80%。取込、移行、検証、出力、公開判定の主要部は動く。
+- **coreライブラリとしてのv4対応**: 約82%。取込、移行、検証、出力、公開判定、golden標準validator回帰の主要部は動く。
 - **実務公開できるプロダクトとしてのv4対応**: 約70〜75%。CI連携、実データ検収、revision/publish、公開URL検証が残る。
 
 ## 2. フェーズ
@@ -39,7 +39,7 @@
 | V4-1 | core入出力MVP | import/migrate/validate/export/filter | ✅ 完了 |
 | V4-2 | 実務検証強化 | v4条件付きルール、Google公開ゲート | ✅ MVP完了 |
 | V4-3 | 標準validator実行 | MobilityData validatorの実行・結果保存 | ✅ CLI MVP完了 |
-| V4-4 | golden sample・実データ回帰 | 最小/夜行/calendar_dates/shape/v3/実データ回帰 | ⏳ 内部サンプル一部完了 / 標準validator・実データ未完 |
+| V4-4 | golden sample・実データ回帰 | 最小/夜行/calendar_dates/shape/v3/実データ回帰 | ⏳ golden標準validator完了 / v3・実データ未完 |
 | V4-5 | Web公開ワークフロー | 公開ゲート、validator結果取込、検収結果表示 | ⏳ 一部完了 |
 | V4-6 | API・永続化・公開URL | spec lock保存、revision、publish、public URL smoke | ⏳ API MVP完了 |
 | V4-7 | 実務OK | 11章A-01〜A-10をCI/運用でpass | ⏳ 未達 |
@@ -86,18 +86,18 @@
 | V4-3-1 | report.json取込 | MobilityData validator結果を集計できる | ✅ |
 | V4-3-2 | validator lock生成 | validator名・版をlock化できる | ✅ |
 | V4-3-3 | Java validator実行ラッパ | zipを渡してreport.jsonを生成できる | ✅ CLI |
-| V4-3-4 | CI/ローカルコマンド | `pnpm gtfs:validate` 相当で実行できる | ⏳ CI未連携 |
+| V4-3-4 | CI/ローカルコマンド | `pnpm gtfs:validate` 相当で実行できる | ⏳ ローカルMVP完了 / CI未連携 |
 | V4-3-5 | Web validator結果取込 | report.jsonをUIから取り込み公開ゲートへ反映 | ✅ MVP |
 
 ### V4-4 golden sample・実データ回帰
 
 | ID | タスク | 受入基準 | 状態 |
 |----|--------|----------|------|
-| V4-4-1 | minimal-fixed-bus | v4 error 0、標準validator error 0 | ⏳ 内部v4 error 0完了 / 標準validator未 |
-| V4-4-2 | overnight-bus | 24時超時刻を標準validatorで確認 | ⏳ 内部検証完了 / 標準validator未 |
-| V4-4-3 | calendar-dates-only | calendarなしでもservice参照が成立 | ✅ 内部検証 |
-| V4-4-4 | translations-kana | 読み仮名出力を確認 | ✅ 内部検証 |
-| V4-4-5 | shape-basic | shapes/trips.shape_idを確認 | ✅ 内部検証 |
+| V4-4-1 | minimal-fixed-bus | v4 error 0、標準validator error 0 | ✅ validator 8.0.1 error 0 |
+| V4-4-2 | overnight-bus | 24時超時刻を標準validatorで確認 | ✅ validator 8.0.1 error 0 |
+| V4-4-3 | calendar-dates-only | calendarなしでもservice参照が成立 | ✅ validator 8.0.1 error 0 |
+| V4-4-4 | translations-kana | 読み仮名出力を確認 | ✅ validator 8.0.1 error 0 |
+| V4-4-5 | shape-basic | shapes/trips.shape_idを確認 | ✅ validator 8.0.1 error 0 |
 | V4-4-6 | legacy-v3-import | v3由来フィードをv4出力へ移行 | ⏳ |
 | V4-4-7 | real-feed-roundtrip-1 | 実フィード取込→再出力→標準validator error 0 | ⏳ |
 
@@ -125,15 +125,13 @@
 
 ## 4. 次の優先順
 
-1. **V4-4 golden sample整備**
-   - 最小サンプルを標準validator error 0にする。
-2. **V4-4 実データ回帰**
+1. **V4-4 実データ回帰**
    - 利用許諾のある実フィード、または匿名化フィードを固定する。
-3. **V4-3-4 validator CI/ローカルコマンド整備**
-   - `gtfs-acceptance --validator-jar` をCIや定型コマンドから実行できるようにする。
-4. **Web編集の実務操作強化**
+2. **V4-3-4 validator CI整備**
+   - `pnpm gtfs:validate-golden` をCIから実行できるようにする。
+3. **Web編集の実務操作強化**
    - shape編集、運賃詳細、停留所削除/並べ替え、路線属性詳細を追加する。
-5. **V4-6 revision/publish/public URL**
+4. **V4-6 revision/publish/public URL**
    - 生成zip、validation結果、lock snapshotを版として保存し、公開URL smokeまでつなぐ。
 
 ## 5. 進捗率の更新ルール

@@ -18,6 +18,9 @@ GTFS-JP v4 golden sample回帰を追加した。
 - **v4 golden sample標準validator一括実行コマンドを追加**。
   `pnpm gtfs:validate-golden` で golden zip を生成し、MobilityData validator の
   `report.json` を `gtfs-tmp/golden-reports/<sample>/` に保存する。
+- **v4 golden sampleの標準validator検収を確認**。
+  2026-06-30に validator 8.0.1 で5サンプルすべて error 0を確認した。
+  レポートは `gtfs-tmp/golden-reports/` に生成される（Git管理外）。
 
 ### 追加（core）
 

@@ -13,7 +13,7 @@
 
 | 領域 | 現在地 | 主な実装済み | 残り |
 |------|--------|--------------|------|
-| GTFS-JP v4 core | 約80% | import/export、v3→v4移行、v4検証、公開ゲート、検収判定、golden内部回帰 | 標準validatorでのgolden確認、実データ回帰 |
+| GTFS-JP v4 core | 約82% | import/export、v3→v4移行、v4検証、公開ゲート、検収判定、golden標準validator回帰 | 実データ回帰、公開URL検証 |
 | Web編集 | MVP完了 | ZIP取込、新規作成、停留所/路線/便追加、検証、公開ゲート表示 | shape編集、運賃詳細、warning承認、公開ワークフロー |
 | API | MVP完了 | spec lockファイル永続化、HTTP検収、RT Alerts/Vehicles/TripUpdates配信 | DB永続化、認証、revision/publish/public URL |
 | GTFS-RT | Alpha〜Beta手前 | ServiceAlerts、RT中継、VehiclePositions、TripUpdates core/API MVP、trip候補・進捗推定 | 地図表示、RT source運用UI、車両位置連動、鮮度監視 |
@@ -25,8 +25,8 @@
 
 | ID | 作業 | 完了条件 | 関連 |
 |----|------|----------|------|
-| P0-1 | v4 golden sampleを標準validatorで検証 | minimal / overnight / calendar_dates / shape の validator error 0 を証跡化 | V4-4 |
-| P0-2 | validator実行をCIまたは定型コマンド化 | `pnpm` から検収が再現でき、失敗時にログが残る | V4-3 |
+| P0-1 | v4 golden sampleを標準validatorで検証 | minimal / overnight / calendar_dates / translations / shape の validator error 0 を証跡化 | ✅ V4-4 |
+| P0-2 | validator実行をCIまたは定型コマンド化 | `pnpm` から検収が再現でき、失敗時にログが残る | ✅ ローカルMVP / CI未 |
 | P0-3 | 実データまたは匿名化データの回帰セットを固定 | 取込→再出力→検証を継続実行できる | V4-4 |
 
 ### P1: 公開ワークフローを形にする
@@ -76,11 +76,11 @@
 
 ## 5. 直近の推奨順
 
-1. validator jarの固定と `pnpm` コマンド化。
-2. v4 golden sampleを標準validatorで error 0 にする。
-3. 実データ回帰セットの方針を決める。
-4. revision保存と publish URL を実装する。
-5. RT VehiclePositions地図表示とTripUpdates実ログ評価へ進む。
+1. 実データ回帰セットの方針を決める。
+2. revision保存と publish URL を実装する。
+3. public URL smoke を作る。
+4. RT VehiclePositions地図表示とTripUpdates実ログ評価へ進む。
+5. Web編集の実務操作（shape編集、運賃詳細、warning承認）を埋める。
 
 ## 6. 100%到達までの刻み
 
@@ -91,7 +91,7 @@
 |------|------|----------|--------------|
 | S1 | validator jar固定 | validator jarの版・配置・Java条件を固定し、ローカルで再現可能 | ✅ MVP: `tools/gtfs-validator.jar` / `GTFS_VALIDATOR_JAR` を採用 |
 | S2 | `pnpm` 検収コマンド化 | `pnpm gtfs:validate` 等で内部検証＋標準validator＋検収を実行できる | ✅ MVP: `pnpm gtfs:validate <gtfs.zip>` を追加 |
-| S3 | v4 golden標準validator通過 | minimal / overnight / calendar_dates / translations / shape が標準validator error 0 | ⏳ golden zip生成・一括validatorコマンド完了 / jar配置後に実行 |
+| S3 | v4 golden標準validator通過 | minimal / overnight / calendar_dates / translations / shape が標準validator error 0 | ✅ 完了: validator 8.0.1で5サンプル error 0（reportは `gtfs-tmp/golden-reports/`） |
 | S4 | 実データ回帰セット固定 | 実フィードまたは匿名化フィードを固定し、取込→再出力→検証が通る | 実務耐性の証跡 |
 | S5 | revision保存 | zip、内部検証、標準validator結果、spec lock snapshotを版として保存 | 公開履歴の土台 |
 | S6 | publish URL実装 | version固定URLとlatest URLを配信できる | 利用者向け公開 |
@@ -110,4 +110,4 @@
 | 95% | S8〜S10完了。API/RTの最低限の運用保護とRT品質評価がある |
 | 100% | S11〜S12完了。Web編集の主要穴が埋まり、一定期間の運用証跡がある |
 
-確認なしで進めやすい次の順番は S3。S4以降は実データ、公開URL、認証方針の確認が必要になる。
+確認なしで進めやすい次の順番は S4 の実データ回帰セット方針整理。実データをrepoへ入れるか、匿名化するかは確認が必要になる。
