@@ -82,3 +82,32 @@
 4. revision保存と publish URL を実装する。
 5. RT VehiclePositions地図表示とTripUpdates実ログ評価へ進む。
 
+## 6. 100%到達までの刻み
+
+「100%」は、core実装だけでなく、標準validator・実データ回帰・公開URL・最低限の運用保護まで揃い、
+作成から公開判断まで再現できる状態とする。
+
+| Step | 刻み | 完了条件 | 100%への寄与 |
+|------|------|----------|--------------|
+| S1 | validator jar固定 | validator jarの版・配置・Java条件を固定し、ローカルで再現可能 | 公開判定の土台 |
+| S2 | `pnpm` 検収コマンド化 | `pnpm gtfs:validate` 等で内部検証＋標準validator＋検収を実行できる | CI/運用の入口 |
+| S3 | v4 golden標準validator通過 | minimal / overnight / calendar_dates / translations / shape が標準validator error 0 | v4仕様適合の証跡 |
+| S4 | 実データ回帰セット固定 | 実フィードまたは匿名化フィードを固定し、取込→再出力→検証が通る | 実務耐性の証跡 |
+| S5 | revision保存 | zip、内部検証、標準validator結果、spec lock snapshotを版として保存 | 公開履歴の土台 |
+| S6 | publish URL実装 | version固定URLとlatest URLを配信できる | 利用者向け公開 |
+| S7 | public URL smoke | 公開URLからzip取得、decode/検証/validator結果取込を確認 | 公開後品質確認 |
+| S8 | API認証・監査ログMVP | 公開・RT書き込み・設定変更にtoken認証と最低限の操作ログを付ける | 運用保護 |
+| S9 | RT地図・鮮度監視 | VehiclePositions地図表示、TripUpdates/VehiclePositions/Alertsの鮮度SLOを見られる | RT運用品質 |
+| S10 | RT実ログ評価 | TripUpdates候補抽出の候補なし/一意/曖昧/正解一致率を実ログで評価 | RT精度評価 |
+| S11 | Web実務編集の穴埋め | shape編集、運賃詳細、warning承認、停留所/便の削除・並べ替えを実装 | 実務編集品質 |
+| S12 | 30日運用チェック | 鮮度逸脱、decode error、source error、公開URL smokeの記録が残る | 実務OK判定 |
+
+### 100%判定の目安
+
+| レベル | 条件 |
+|--------|------|
+| 90% | S1〜S7完了。静的GTFS-JP v4を検証し、公開URLとして配信できる |
+| 95% | S8〜S10完了。API/RTの最低限の運用保護とRT品質評価がある |
+| 100% | S11〜S12完了。Web編集の主要穴が埋まり、一定期間の運用証跡がある |
+
+確認なしで進めやすい順番は S1 → S2 → S3。S4以降は実データ、公開URL、認証方針の確認が必要になる。
