@@ -8,6 +8,12 @@ GTFS Studio（西沢ツールWEB版）の段階的実装の記録。仕様書（
 GTFS-RTの書き込み系を運用に寄せ、TripUpdatesの最小生成・配信と
 GTFS-JP v4 golden sample回帰を追加した。
 
+### 追加（root）
+
+- **標準validator検収のルートコマンドを追加**。
+  `pnpm gtfs:validate <gtfs.zip>` で `packages/core/bin/gtfs-acceptance.mjs` を呼び出す。
+  MobilityData validator jar は `tools/gtfs-validator.jar` または `GTFS_VALIDATOR_JAR` で指定する。
+
 ### 追加（core）
 
 - **TripUpdates builder/storeを追加**（`packages/core/src/realtime.ts`）。

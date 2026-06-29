@@ -89,8 +89,8 @@
 
 | Step | 刻み | 完了条件 | 100%への寄与 |
 |------|------|----------|--------------|
-| S1 | validator jar固定 | validator jarの版・配置・Java条件を固定し、ローカルで再現可能 | 公開判定の土台 |
-| S2 | `pnpm` 検収コマンド化 | `pnpm gtfs:validate` 等で内部検証＋標準validator＋検収を実行できる | CI/運用の入口 |
+| S1 | validator jar固定 | validator jarの版・配置・Java条件を固定し、ローカルで再現可能 | ✅ MVP: `tools/gtfs-validator.jar` / `GTFS_VALIDATOR_JAR` を採用 |
+| S2 | `pnpm` 検収コマンド化 | `pnpm gtfs:validate` 等で内部検証＋標準validator＋検収を実行できる | ✅ MVP: `pnpm gtfs:validate <gtfs.zip>` を追加 |
 | S3 | v4 golden標準validator通過 | minimal / overnight / calendar_dates / translations / shape が標準validator error 0 | v4仕様適合の証跡 |
 | S4 | 実データ回帰セット固定 | 実フィードまたは匿名化フィードを固定し、取込→再出力→検証が通る | 実務耐性の証跡 |
 | S5 | revision保存 | zip、内部検証、標準validator結果、spec lock snapshotを版として保存 | 公開履歴の土台 |
@@ -110,4 +110,4 @@
 | 95% | S8〜S10完了。API/RTの最低限の運用保護とRT品質評価がある |
 | 100% | S11〜S12完了。Web編集の主要穴が埋まり、一定期間の運用証跡がある |
 
-確認なしで進めやすい順番は S1 → S2 → S3。S4以降は実データ、公開URL、認証方針の確認が必要になる。
+確認なしで進めやすい次の順番は S3。S4以降は実データ、公開URL、認証方針の確認が必要になる。

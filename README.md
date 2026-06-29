@@ -32,6 +32,17 @@ pnpm -r build      # 全パッケージビルド
 pnpm -r test       # 全パッケージテスト
 ```
 
+### 検収・標準validator
+
+```bash
+pnpm gtfs:validate path/to/gtfs.zip
+```
+
+- MobilityData validator jar は `tools/gtfs-validator.jar` に置く。
+- 別パスを使う場合は `GTFS_VALIDATOR_JAR=/path/to/gtfs-validator.jar pnpm gtfs:validate path/to/gtfs.zip`。
+- 既存の `report.json` を使う場合は `pnpm gtfs:validate path/to/gtfs.zip --report report.json`。
+- `tools/gtfs-validator.jar` はGit管理外。
+
 ### packages/core
 
 GTFSの **取込（zip→内部モデル）→ 検証 → 再出力（→zip）** を担う中核ロジック。
