@@ -5,7 +5,7 @@ GTFS-JP（v4）/ GTFS-RT 形式の公開用オープンデータを、取込・�
 
 - **OSS＋コミュニティサポート**を中核とし、SaaS提供と自治体オンプレ運用の双方を可能にする。
 - 仕様書は [`docs/spec/`](./docs/spec/README.md) を参照。
-- 実装の進捗は [`docs/STATUS.md`](./docs/STATUS.md)、変更履歴は [`CHANGELOG.md`](./CHANGELOG.md) を参照。
+- 全体ロードマップは [`docs/ROADMAP.md`](./docs/ROADMAP.md)、実装の進捗は [`docs/STATUS.md`](./docs/STATUS.md)、変更履歴は [`CHANGELOG.md`](./CHANGELOG.md) を参照。
 
 > 本プロジェクトは、西沢明氏が無償公開した「西沢ツール」が日本のバスオープンデータ普及に果たした功績を出発点とし、その志をOSSとコミュニティで引き継ぐことを目的とする。
 
@@ -14,6 +14,7 @@ GTFS-JP（v4）/ GTFS-RT 形式の公開用オープンデータを、取込・�
 ```
 docs/
   spec/           仕様書一式（01〜11章）
+  ROADMAP.md      全体ロードマップ・優先順位・確認事項
   STATUS.md       仕様 ⇄ 実装の対応表（実装進捗）
 CHANGELOG.md      変更履歴
 packages/

@@ -8,6 +8,12 @@
 - コア・テスト: 117 件 pass（`pnpm --filter @gtfs-studio/core test`）
 - API・テスト: 24 件 pass（`pnpm --filter @gtfs-studio/api test`）
 
+## 0. ロードマップ
+
+全体優先順位と確認事項は [`ROADMAP.md`](./ROADMAP.md) に集約する。
+個別の達成管理は GTFS-JP v4 が [`GTFS_JP_V4_ROADMAP.md`](./GTFS_JP_V4_ROADMAP.md)、
+GTFS-RT が [`GTFS_RT_ROADMAP.md`](./GTFS_RT_ROADMAP.md)。
+
 ## 1. パイプライン全体
 
 | 段階 | 実装 | 状態 | 主担当ファイル |

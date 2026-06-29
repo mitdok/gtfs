@@ -4,6 +4,8 @@
 
 本書はGTFS StudioのGTFS-JP v4対応を、実装・検証・公開運用の観点で段階管理する。対象は固定路線バスの静的GTFS-JP v4 MVPであり、GTFS-RT、GTFS-Flex、Fares v2は別フェーズとして扱う。
 
+全体優先順位と横断的な確認事項は [`ROADMAP.md`](./ROADMAP.md) に集約する。
+
 ## 1. 現在地
 
 総合進捗: **80%**
