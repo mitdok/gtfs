@@ -98,6 +98,28 @@ export interface RealtimeTripMatchEvaluation {
   results: RealtimeTripMatchProbeResult[];
 }
 
+export interface StopProgressInput {
+  tripId: string;
+  /** GTFS時刻（例: 07:05:00 / 25:05:00）またはサービス日からの秒。 */
+  atTime: string | number;
+  /** 秒単位の遅延。指定時は静的時刻に加算して進捗判定する。 */
+  delaySec?: number;
+}
+
+export interface StopProgressEstimate {
+  trip: StaticTripForRealtime;
+  status: "before_start" | "in_progress" | "after_end" | "no_stop_times";
+  /** 直近で通過済み、または停車中とみなせる停留所。 */
+  currentStopTime?: StaticStopTime;
+  /** 次に到着予定の停留所。 */
+  nextStopTime?: StaticStopTime;
+  currentAdjustedTimeSec?: number;
+  nextAdjustedTimeSec?: number;
+  delaySec: number;
+  /** current→next間の進捗。停留所間が判定できる時だけ0〜1で返す。 */
+  progressRatio?: number;
+}
+
 /**
  * 静的GTFSからTripUpdates生成に必要な trips/stop_times index を作る。
  * route/service/trip/stop_sequence を素直に引ける軽量な読み取り専用構造。
@@ -264,6 +286,90 @@ export function evaluateRealtimeTripMatching(
 }
 
 /**
+ * 静的stop_timesと任意の遅延秒から、現在/次停留所を推定する。
+ * GPSを使わないため実位置ではなく、サービス日内時刻に対するダイヤ上の進捗を返す。
+ */
+export function estimateStopProgress(
+  index: RealtimeTripIndex,
+  input: StopProgressInput,
+): StopProgressEstimate {
+  const trip = index.byTripId.get(input.tripId);
+  if (!trip) throw new Error(`unknown trip_id: ${input.tripId}`);
+  const atSec = parseMatchTime(input.atTime);
+  const delaySec = input.delaySec ?? 0;
+  if (!Number.isInteger(delaySec)) throw new Error("delaySec must be an integer number of seconds");
+
+  const timedStops = trip.stopTimes
+    .map((stop) => ({ stop, adjustedSec: representativeStopTimeSec(stop) }))
+    .filter((item): item is { stop: StaticStopTime; adjustedSec: number } => item.adjustedSec !== undefined)
+    .map((item) => ({ ...item, adjustedSec: item.adjustedSec + delaySec }));
+  if (timedStops.length === 0) {
+    return { trip, status: "no_stop_times", delaySec };
+  }
+
+  const next = timedStops.find((item) => item.adjustedSec > atSec);
+  if (!next) {
+    const last = timedStops[timedStops.length - 1]!;
+    return {
+      trip,
+      status: "after_end",
+      currentStopTime: last.stop,
+      currentAdjustedTimeSec: last.adjustedSec,
+      delaySec,
+    };
+  }
+
+  const nextIndex = timedStops.indexOf(next);
+  const current = nextIndex > 0 ? timedStops[nextIndex - 1] : undefined;
+  if (!current) {
+    return {
+      trip,
+      status: "before_start",
+      nextStopTime: next.stop,
+      nextAdjustedTimeSec: next.adjustedSec,
+      delaySec,
+    };
+  }
+
+  const span = next.adjustedSec - current.adjustedSec;
+  return {
+    trip,
+    status: "in_progress",
+    currentStopTime: current.stop,
+    nextStopTime: next.stop,
+    currentAdjustedTimeSec: current.adjustedSec,
+    nextAdjustedTimeSec: next.adjustedSec,
+    delaySec,
+    progressRatio: span <= 0 ? undefined : clamp01((atSec - current.adjustedSec) / span),
+  };
+}
+
+/**
+ * 進捗推定からTripUpdateを作る。
+ * 次停留所があれば次停留所以降、終端後なら最終停留所から遅延を反映する。
+ */
+export function tripProgressToTripUpdate(
+  index: RealtimeTripIndex,
+  input: StopProgressInput & { id?: string; timestamp?: number | Date | string; vehicleId?: string },
+): TripUpdateInput {
+  const progress = estimateStopProgress(index, input);
+  const fromStopSequence =
+    progress.nextStopTime?.stopSequence ?? progress.currentStopTime?.stopSequence;
+  if (fromStopSequence === undefined) {
+    throw new Error(`trip "${input.tripId}" has no timed stop_times for progress update`);
+  }
+  return tripDelayToTripUpdate(index, {
+    id: input.id,
+    tripId: input.tripId,
+    delaySec: progress.delaySec,
+    fromStopSequence,
+    timestamp: input.timestamp,
+    vehicleId: input.vehicleId,
+  });
+}
+
+
+/**
  * trip_id が特定済みの遅延情報を、GTFS-RT TripUpdateInputへ展開する。
  * 位置・運用番号からのtrip推定は別レイヤで行い、この関数は静的GTFSとの整合を保証する。
  */
@@ -324,6 +430,10 @@ function comparableStopTimes(trip: StaticTripForRealtime, atStopId: string | und
   return first ? [first] : [];
 }
 
+function representativeStopTimeSec(stop: StaticStopTime): number | undefined {
+  return stop.departureSec ?? stop.arrivalSec;
+}
+
 function parseMatchTime(value: string | number): number {
   if (typeof value === "number") {
     if (!Number.isFinite(value) || value < 0) throw new Error("atTime must be a non-negative service-day second");
@@ -342,6 +452,10 @@ function parseGtfsTime(value: string | undefined): number | undefined {
 
 function average(values: number[]): number {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, value));
 }
 
 function parseNonNegativeInteger(value: string | undefined): number | undefined {

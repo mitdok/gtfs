@@ -5,7 +5,7 @@
 
 - 最終更新: 2026-06-30
 - 対象コミット: 本ファイルと同一リビジョン
-- コア・テスト: 115 件 pass（`pnpm --filter @gtfs-studio/core test`）
+- コア・テスト: 117 件 pass（`pnpm --filter @gtfs-studio/core test`）
 - API・テスト: 24 件 pass（`pnpm --filter @gtfs-studio/api test`）
 
 ## 1. パイプライン全体
@@ -25,7 +25,7 @@
 | バックエンドAPI（仕様ロック永続化・検収HTTP） | `createApiServer` / `gtfs-api` | ✅ node:http・依存ゼロ | `packages/api/src/server.ts`, `api/bin/gtfs-api.mjs` |
 | GTFS-RT ServiceAlerts | `encodeServiceAlertsFeed` | ✅ core builder | `src/realtime.ts` |
 | GTFS-RT 外部中継（RT-2） | `createRtRelayService` / `validateRealtimeFeed` | ✅ poll・正規化・鮮度・再配信 | `core/src/realtime-relay.ts`, `api/src/rt-relay.ts` |
-| GTFS-RT TripUpdates | `encodeTripUpdatesFeed` / `createRealtimeTripUpdateStore` / `buildRealtimeTripIndex` / `findRealtimeTripCandidates` / `evaluateRealtimeTripMatching` | ✅ core/API MVP＋静的index・trip候補・評価MVP | `core/src/realtime.ts`, `core/src/realtime-trip-index.ts`, `api/src/server.ts` |
+| GTFS-RT TripUpdates | `encodeTripUpdatesFeed` / `createRealtimeTripUpdateStore` / `buildRealtimeTripIndex` / `estimateStopProgress` | ✅ core/API MVP＋静的index・trip候補・進捗推定・評価MVP | `core/src/realtime.ts`, `core/src/realtime-trip-index.ts`, `api/src/server.ts` |
 
 ## 2. プロファイル（仕様 10.1）
 
@@ -121,7 +121,7 @@ GTFS-RTはフェーズ2以降の対象。ロードマップ、課題、達成管
 | RT-1 | ✅ core store＋API pb配信完了 / Webはローカル保存 | ServiceAlerts手動投入＋protobuf配信（`src/realtime.ts`, `api/server.ts`, `RealtimeAlertsView.tsx`） |
 | RT-2 | ✅ core relay＋api poller/配信 | 外部GTFS-RT中継・正規化（`realtime-relay.ts`, `api/rt-relay.ts`） |
 | RT-3 | ⏳ core store＋API pb配信・認証MVP完了 / 地図表示未実装 | VehiclePositions protobuf生成・最新位置保存・HTTP配信（`src/realtime.ts`, `api/server.ts`） |
-| RT-4 | ⏳ core store＋API pb配信＋静的index・trip候補・評価MVP完了 / 車両位置連動未実装 | TripUpdates生成・静的GTFS突合 |
+| RT-4 | ⏳ core store＋API pb配信＋静的index・trip候補・進捗推定・評価MVP完了 / 車両位置連動未実装 | TripUpdates生成・静的GTFS突合 |
 | RT-5 | ⏳ 未着手 | 鮮度SLO、監視、公開URL検証 |
 
 > 凡例: ✅ 実装済 / ⏳ 未実装・予定。

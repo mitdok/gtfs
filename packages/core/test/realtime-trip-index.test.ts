@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { importEntries } from "../src/importer.js";
 import {
   buildRealtimeTripIndex,
+  estimateStopProgress,
   evaluateRealtimeTripMatching,
   findRealtimeTripCandidates,
   matchedTripDelayToTripUpdate,
+  tripProgressToTripUpdate,
   tripDelayToTripUpdate,
 } from "../src/realtime-trip-index.js";
 import { decodeRealtimeFeed, encodeTripUpdatesFeed } from "../src/realtime.js";
@@ -142,6 +144,40 @@ describe("GTFS-RT TripUpdates static index", () => {
     expect(evaluation.maxBestTimeDiffSec).toBeGreaterThanOrEqual(evaluation.averageBestTimeDiffSec!);
   });
 
+  it("静的時刻と遅延秒から現在/次停留所を推定できる", () => {
+    const index = buildRealtimeTripIndex(sampleFeed());
+
+    const before = estimateStopProgress(index, { tripId: "T1", atTime: "06:59:00" });
+    expect(before.status).toBe("before_start");
+    expect(before.nextStopTime?.stopId).toBe("S1");
+
+    const progress = estimateStopProgress(index, { tripId: "T1", atTime: "07:06:00", delaySec: 60 });
+    expect(progress.status).toBe("in_progress");
+    expect(progress.currentStopTime?.stopId).toBe("S2");
+    expect(progress.nextStopTime?.stopId).toBe("S3");
+    expect(progress.currentAdjustedTimeSec).toBe(7 * 3600 + 6 * 60);
+    expect(progress.progressRatio).toBe(0);
+
+    const after = estimateStopProgress(index, { tripId: "T1", atTime: "07:30:00" });
+    expect(after.status).toBe("after_end");
+    expect(after.currentStopTime?.stopId).toBe("S3");
+  });
+
+  it("進捗推定から次停留所以降のTripUpdateを作れる", () => {
+    const index = buildRealtimeTripIndex(sampleFeed());
+    const update = tripProgressToTripUpdate(index, {
+      tripId: "T1",
+      atTime: "07:06:00",
+      delaySec: 60,
+      vehicleId: "bus-1",
+    });
+
+    expect(update.tripId).toBe("T1");
+    expect(update.vehicleId).toBe("bus-1");
+    expect(update.stopTimeUpdates.map((stop) => stop.stopId)).toEqual(["S3"]);
+    expect(update.stopTimeUpdates[0]?.arrivalDelay).toBe(60);
+  });
+
   it("未知tripや静的GTFSにない停留所を拒否する", () => {
     const index = buildRealtimeTripIndex(sampleFeed());
 
@@ -159,5 +195,6 @@ describe("GTFS-RT TripUpdates static index", () => {
         delaySec: 60,
       }),
     ).toThrow(/no trip candidate/);
+    expect(() => estimateStopProgress(index, { tripId: "NOPE", atTime: "07:00:00" })).toThrow(/unknown trip_id/);
   });
 });
