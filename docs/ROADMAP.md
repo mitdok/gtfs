@@ -13,7 +13,7 @@
 
 | 領域 | 現在地 | 主な実装済み | 残り |
 |------|--------|--------------|------|
-| GTFS-JP v4 core | 約82% | import/export、v3→v4移行、v4検証、公開ゲート、検収判定、golden標準validator回帰 | 実データ回帰、公開URL検証 |
+| GTFS-JP v4 core | 約83% | import/export、v3→v4移行、v4検証、公開ゲート、検収判定、golden標準validator回帰、CI定義 | 実データ回帰、公開URL検証 |
 | Web編集 | MVP完了 | ZIP取込、新規作成、停留所/路線/便追加、検証、公開ゲート表示 | shape編集、運賃詳細、warning承認、公開ワークフロー |
 | API | MVP完了 | spec lockファイル永続化、HTTP検収、RT Alerts/Vehicles/TripUpdates配信 | DB永続化、認証、revision/publish/public URL |
 | GTFS-RT | Alpha〜Beta手前 | ServiceAlerts、RT中継、VehiclePositions、TripUpdates core/API MVP、trip候補・進捗推定 | 地図表示、RT source運用UI、車両位置連動、鮮度監視 |
@@ -26,7 +26,7 @@
 | ID | 作業 | 完了条件 | 関連 |
 |----|------|----------|------|
 | P0-1 | v4 golden sampleを標準validatorで検証 | minimal / overnight / calendar_dates / translations / shape の validator error 0 を証跡化 | ✅ V4-4 |
-| P0-2 | validator実行をCIまたは定型コマンド化 | `pnpm` から検収が再現でき、失敗時にログが残る | ✅ ローカルMVP / CI未 |
+| P0-2 | validator実行をCIまたは定型コマンド化 | `pnpm` から検収が再現でき、失敗時にログが残る | ✅ Gitea Actions定義追加 / runner実績待ち |
 | P0-3 | 実データまたは匿名化データの回帰セットを固定 | 取込→再出力→検証を継続実行できる | V4-4 |
 
 ### P1: 公開ワークフローを形にする

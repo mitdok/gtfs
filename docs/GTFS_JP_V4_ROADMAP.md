@@ -8,7 +8,7 @@
 
 ## 1. 現在地
 
-総合進捗: **82%**
+総合進捗: **83%**
 
 内訳:
 
@@ -20,15 +20,15 @@
 | v4出力・プロファイルフィルタ | 10 | 8 | ✅ MVP / 公開URL検証不足 | `exporter.ts`, `export-profile.ts` |
 | v4検証ルール | 18 | 16 | ✅ 中核 / 均一運賃以外の詳細・実データ精査不足 | `validator.ts` |
 | Google公開ゲート・公開可否判定 | 10 | 8 | ✅ 判定器＋Web表示 / 運用証跡不足 | `release-gate.ts`, `ReleaseGateView.tsx` |
-| 標準validator連携 | 10 | 7 | ✅ report取込＋CLI Java起動 / CI連携未完 | `standard-validator.ts`, `gtfs-acceptance.mjs` |
+| 標準validator連携 | 10 | 8 | ✅ report取込＋CLI Java起動＋CI定義 / runner実績待ち | `standard-validator.ts`, `gtfs-acceptance.mjs`, `.gitea/workflows/ci.yml` |
 | golden sample・実データ検収 | 10 | 7 | ⏳ golden標準validator error 0完了 / 実データ不足 | `acceptance.ts`, `v4-golden-samples.ts`, `gtfs-validate-golden.mjs` |
 | Web編集・出力ワークフロー | 7 | 7 | ✅ 新規作成＋路線/停留所/便追加MVP / 公開ワークフロー未完 | `packages/web` |
 | API・永続化・公開URL運用 | 5 | 3 | ✅ API＋ファイル永続化MVP / revision・publish未完 | `packages/api` |
-| **合計** | **100** | **82** |  |  |
+| **合計** | **100** | **83** |  |  |
 
 読み替え:
 
-- **coreライブラリとしてのv4対応**: 約82%。取込、移行、検証、出力、公開判定、golden標準validator回帰の主要部は動く。
+- **coreライブラリとしてのv4対応**: 約83%。取込、移行、検証、出力、公開判定、golden標準validator回帰とCI定義の主要部は動く。
 - **実務公開できるプロダクトとしてのv4対応**: 約70〜75%。CI連携、実データ検収、revision/publish、公開URL検証が残る。
 
 ## 2. フェーズ
@@ -86,7 +86,7 @@
 | V4-3-1 | report.json取込 | MobilityData validator結果を集計できる | ✅ |
 | V4-3-2 | validator lock生成 | validator名・版をlock化できる | ✅ |
 | V4-3-3 | Java validator実行ラッパ | zipを渡してreport.jsonを生成できる | ✅ CLI |
-| V4-3-4 | CI/ローカルコマンド | `pnpm gtfs:validate` 相当で実行できる | ⏳ jar取得＋ローカルMVP完了 / CI未連携 |
+| V4-3-4 | CI/ローカルコマンド | `pnpm gtfs:validate` 相当で実行できる | ✅ Gitea Actions定義追加 / runner実績待ち |
 | V4-3-5 | Web validator結果取込 | report.jsonをUIから取り込み公開ゲートへ反映 | ✅ MVP |
 
 ### V4-4 golden sample・実データ回帰
@@ -127,11 +127,9 @@
 
 1. **V4-4 実データ回帰**
    - 利用許諾のある実フィード、または匿名化フィードを固定する。
-2. **V4-3-4 validator CI整備**
-   - `pnpm gtfs:validate-golden` をCIから実行できるようにする。
-3. **Web編集の実務操作強化**
+2. **Web編集の実務操作強化**
    - shape編集、運賃詳細、停留所削除/並べ替え、路線属性詳細を追加する。
-4. **V4-6 revision/publish/public URL**
+3. **V4-6 revision/publish/public URL**
    - 生成zip、validation結果、lock snapshotを版として保存し、公開URL smokeまでつなぐ。
 
 ## 5. 進捗率の更新ルール

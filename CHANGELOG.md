@@ -16,6 +16,9 @@ GTFS-JP v4 golden sample回帰を追加した。
 - **MobilityData validator取得コマンドを追加**。
   `pnpm gtfs:validator:install` で validator `8.0.1` を `tools/gtfs-validator.jar` に配置し、
   SHA-256を確認する。
+- **Gitea Actions CIを追加**。
+  build/test と golden validator を分け、`pnpm gtfs:validator:install` から
+  `pnpm gtfs:validate-golden` までをCIで再現できるようにした。
 - **v4 golden sample zip生成コマンドを追加**。
   `pnpm gtfs:golden` で内部v4検証 error 0 を確認し、`gtfs-tmp/golden/*.zip` を生成する。
 - **v4 golden sample標準validator一括実行コマンドを追加**。
