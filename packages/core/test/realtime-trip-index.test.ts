@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { importEntries } from "../src/importer.js";
 import {
   buildRealtimeTripIndex,
+  evaluateRealtimeTripMatching,
   findRealtimeTripCandidates,
   matchedTripDelayToTripUpdate,
   tripDelayToTripUpdate,
@@ -98,6 +99,47 @@ describe("GTFS-RT TripUpdates static index", () => {
     expect(update.vehicleId).toBe("bus-1");
     expect(update.stopTimeUpdates.map((stop) => stop.stopId)).toEqual(["S2", "S3"]);
     expect(update.stopTimeUpdates[0]?.departureDelay).toBe(90);
+  });
+
+  it("trip候補抽出の品質を集計できる", () => {
+    const index = buildRealtimeTripIndex(sampleFeed());
+    const evaluation = evaluateRealtimeTripMatching(index, [
+      {
+        routeId: "R1",
+        atTime: "07:05:30",
+        atStopId: "S2",
+        maxTimeDiffSec: 120,
+        expectedTripId: "T1",
+      },
+      {
+        routeId: "R1",
+        atTime: "25:05:30",
+        atStopId: "S2",
+        maxTimeDiffSec: 120,
+        expectedTripId: "T2",
+      },
+      {
+        routeId: "R1",
+        atTime: "12:00:00",
+        maxTimeDiffSec: 60,
+        expectedTripId: "T1",
+      },
+      {
+        routeId: "R1",
+        atTime: "07:04:30",
+        maxTimeDiffSec: 24 * 3600,
+      },
+    ]);
+
+    expect(evaluation.total).toBe(4);
+    expect(evaluation.unique).toBe(2);
+    expect(evaluation.miss).toBe(1);
+    expect(evaluation.ambiguous).toBe(1);
+    expect(evaluation.expectedKnown).toBe(3);
+    expect(evaluation.expectedMatched).toBe(2);
+    expect(evaluation.expectedAccuracy).toBeCloseTo(2 / 3);
+    expect(evaluation.averageBestTimeDiffSec).toBeGreaterThan(0);
+    expect(evaluation.maxBestTimeDiffSec).toBeGreaterThanOrEqual(evaluation.averageBestTimeDiffSec!);
   });
 
   it("未知tripや静的GTFSにない停留所を拒否する", () => {

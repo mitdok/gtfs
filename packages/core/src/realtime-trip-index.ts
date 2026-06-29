@@ -71,6 +71,33 @@ export interface MatchedTripDelayInput extends RealtimeTripMatchInput {
   vehicleId?: string;
 }
 
+export interface RealtimeTripMatchProbe extends RealtimeTripMatchInput {
+  /** 正解trip_idが分かっている評価データの場合に指定する。 */
+  expectedTripId?: string;
+}
+
+export interface RealtimeTripMatchProbeResult {
+  probe: RealtimeTripMatchProbe;
+  candidates: RealtimeTripMatch[];
+  bestTripId?: string;
+  bestTimeDiffSec?: number;
+  matchedExpected?: boolean;
+  status: "miss" | "unique" | "ambiguous";
+}
+
+export interface RealtimeTripMatchEvaluation {
+  total: number;
+  miss: number;
+  unique: number;
+  ambiguous: number;
+  expectedKnown: number;
+  expectedMatched: number;
+  expectedAccuracy: number | null;
+  averageBestTimeDiffSec: number | null;
+  maxBestTimeDiffSec: number | null;
+  results: RealtimeTripMatchProbeResult[];
+}
+
 /**
  * 静的GTFSからTripUpdates生成に必要な trips/stop_times index を作る。
  * route/service/trip/stop_sequence を素直に引ける軽量な読み取り専用構造。
@@ -193,6 +220,50 @@ export function matchedTripDelayToTripUpdate(
 }
 
 /**
+ * trip候補抽出の品質を評価する。
+ * 実データログを `RealtimeTripMatchProbe` に変換して渡すと、候補なし・一意・曖昧・正解一致率を確認できる。
+ */
+export function evaluateRealtimeTripMatching(
+  index: RealtimeTripIndex,
+  probes: RealtimeTripMatchProbe[],
+): RealtimeTripMatchEvaluation {
+  const results = probes.map((probe) => {
+    const candidates = findRealtimeTripCandidates(index, probe);
+    const best = candidates[0];
+    const matchedExpected =
+      probe.expectedTripId === undefined ? undefined : best?.trip.tripId === probe.expectedTripId;
+    const status: RealtimeTripMatchProbeResult["status"] =
+      candidates.length === 0 ? "miss" : candidates.length === 1 ? "unique" : "ambiguous";
+    return {
+      probe,
+      candidates,
+      bestTripId: best?.trip.tripId,
+      bestTimeDiffSec: best?.timeDiffSec,
+      matchedExpected,
+      status,
+    };
+  });
+
+  const bestDiffs = results
+    .map((result) => result.bestTimeDiffSec)
+    .filter((value): value is number => value !== undefined);
+  const expectedResults = results.filter((result) => result.matchedExpected !== undefined);
+  const expectedMatched = expectedResults.filter((result) => result.matchedExpected).length;
+  return {
+    total: results.length,
+    miss: results.filter((result) => result.status === "miss").length,
+    unique: results.filter((result) => result.status === "unique").length,
+    ambiguous: results.filter((result) => result.status === "ambiguous").length,
+    expectedKnown: expectedResults.length,
+    expectedMatched,
+    expectedAccuracy: expectedResults.length === 0 ? null : expectedMatched / expectedResults.length,
+    averageBestTimeDiffSec: bestDiffs.length === 0 ? null : average(bestDiffs),
+    maxBestTimeDiffSec: bestDiffs.length === 0 ? null : Math.max(...bestDiffs),
+    results,
+  };
+}
+
+/**
  * trip_id が特定済みの遅延情報を、GTFS-RT TripUpdateInputへ展開する。
  * 位置・運用番号からのtrip推定は別レイヤで行い、この関数は静的GTFSとの整合を保証する。
  */
@@ -267,6 +338,10 @@ function parseGtfsTime(value: string | undefined): number | undefined {
   const trimmed = value?.trim();
   if (!trimmed) return undefined;
   return hmsToSec(trimmed) ?? undefined;
+}
+
+function average(values: number[]): number {
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
 function parseNonNegativeInteger(value: string | undefined): number | undefined {

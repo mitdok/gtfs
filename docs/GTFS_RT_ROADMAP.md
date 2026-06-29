@@ -30,7 +30,7 @@
 | RT-1 | ServiceAlerts最小実装 | 手動Alert入力モデル、protobuf生成、HTTP配信 | ✅ core store＋API pb配信完了 / Webはローカル保存 |
 | RT-2 | 外部GTFS-RT中継 | 既存 `.pb` の取得、検証、キャッシュ、再配信 | ✅ core relay＋api poller/配信完了 |
 | RT-3 | VehiclePositions取込 | GPS/外部JSON入力、車両位置Feed生成 | ⏳ core store＋API配信・認証MVP完了 / 地図表示未実装 |
-| RT-4 | TripUpdates生成 | 静的GTFSとの突合、遅延算出、StopTimeUpdate生成 | ⏳ core store＋API配信＋静的index・trip候補MVP完了 / 車両位置連動未実装 |
+| RT-4 | TripUpdates生成 | 静的GTFSとの突合、遅延算出、StopTimeUpdate生成 | ⏳ core store＋API配信＋静的index・trip候補・評価MVP完了 / 車両位置連動未実装 |
 | RT-5 | 運用品質 | 監視、鮮度SLO、公開URL検証、Google申請前チェック | ⏳ 未着手 |
 
 ## 3. 実装タスク管理
@@ -77,7 +77,7 @@
 | RT-4-3 | stop進捗推定 | 現在/次停留所と遅延秒を算出できる | ⏳ |
 | RT-4-4 | StopTimeUpdate生成 | arrival/departure delay/timeを出力できる | ✅ core/API MVP |
 | RT-4-5 | 運休・途中打切 | schedule_relationshipを仕様版に従って表現 | ✅ core/API MVP |
-| RT-4-6 | 品質評価 | 実データでtrip特定率、age、欠損率を計測 | ⏳ |
+| RT-4-6 | 品質評価 | 実データでtrip特定率、age、欠損率を計測 | ⏳ 候補抽出評価MVP完了 / 実データ未 |
 
 ### RT-5 運用品質・公開管理
 
@@ -123,3 +123,4 @@
 8. TripUpdatesの手動/外部入力MVPを追加し、`GET /rt/trip-updates.pb` で配信する。 ✅
 9. 静的GTFSの `trips.txt` / `stop_times.txt` からTripUpdates用indexを作り、trip_id基準の遅延をStopTimeUpdateへ展開する。 ✅
 10. route_id・時刻・任意stop_idからTripUpdates用の候補tripを近い順に抽出する。 ✅
+11. TripUpdates候補抽出の候補なし・一意・曖昧・正解一致率を集計する。 ✅
