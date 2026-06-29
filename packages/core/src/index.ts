@@ -19,3 +19,4 @@ export * from "./starter-feed.js";
 export * from "./export-profile.js";
 export * from "./exporter.js";
 export * from "./realtime-trip-index.js";
+export * from "./v4-golden-samples.js";

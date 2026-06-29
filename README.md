@@ -42,6 +42,7 @@ pnpm gtfs:validate path/to/gtfs.zip
 - 別パスを使う場合は `GTFS_VALIDATOR_JAR=/path/to/gtfs-validator.jar pnpm gtfs:validate path/to/gtfs.zip`。
 - 既存の `report.json` を使う場合は `pnpm gtfs:validate path/to/gtfs.zip --report report.json`。
 - `tools/gtfs-validator.jar` はGit管理外。
+- `pnpm gtfs:golden` で v4 golden sample zip を `gtfs-tmp/golden/` に生成できる。
 
 ### packages/core
 

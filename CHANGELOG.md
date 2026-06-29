@@ -13,6 +13,8 @@ GTFS-JP v4 golden sample回帰を追加した。
 - **標準validator検収のルートコマンドを追加**。
   `pnpm gtfs:validate <gtfs.zip>` で `packages/core/bin/gtfs-acceptance.mjs` を呼び出す。
   MobilityData validator jar は `tools/gtfs-validator.jar` または `GTFS_VALIDATOR_JAR` で指定する。
+- **v4 golden sample zip生成コマンドを追加**。
+  `pnpm gtfs:golden` で内部v4検証 error 0 を確認し、`gtfs-tmp/golden/*.zip` を生成する。
 
 ### 追加（core）
 
@@ -40,6 +42,7 @@ GTFS-JP v4 golden sample回帰を追加した。
 - **GTFS-JP v4 golden sampleテストを追加**。
   minimal-fixed-bus、overnight-bus、calendar-dates-only、translations-kana、
   shape-basic、v4出力後の再検証を内部validator error 0で確認する。
+  サンプル定義は `v4-golden-samples.ts` に集約し、テストとzip生成で共用する。
 
 ### 追加（api）
 

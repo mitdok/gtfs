@@ -91,7 +91,7 @@
 |------|------|----------|--------------|
 | S1 | validator jar固定 | validator jarの版・配置・Java条件を固定し、ローカルで再現可能 | ✅ MVP: `tools/gtfs-validator.jar` / `GTFS_VALIDATOR_JAR` を採用 |
 | S2 | `pnpm` 検収コマンド化 | `pnpm gtfs:validate` 等で内部検証＋標準validator＋検収を実行できる | ✅ MVP: `pnpm gtfs:validate <gtfs.zip>` を追加 |
-| S3 | v4 golden標準validator通過 | minimal / overnight / calendar_dates / translations / shape が標準validator error 0 | v4仕様適合の証跡 |
+| S3 | v4 golden標準validator通過 | minimal / overnight / calendar_dates / translations / shape が標準validator error 0 | ⏳ golden zip生成MVP完了 / 標準validator実行待ち |
 | S4 | 実データ回帰セット固定 | 実フィードまたは匿名化フィードを固定し、取込→再出力→検証が通る | 実務耐性の証跡 |
 | S5 | revision保存 | zip、内部検証、標準validator結果、spec lock snapshotを版として保存 | 公開履歴の土台 |
 | S6 | publish URL実装 | version固定URLとlatest URLを配信できる | 利用者向け公開 |
