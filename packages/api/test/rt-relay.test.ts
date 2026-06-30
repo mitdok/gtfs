@@ -467,6 +467,41 @@ describe("RT-3 VehiclePositions API", () => {
     ]);
   });
 
+  it("trip_idなしのVehiclePositionでもGPS位置からTripUpdate候補を生成できる", async () => {
+    await restart({
+      repository: openSpecLockRepository("/tmp/__rt_vehicle_gps_trip_update_locks_unused.json"),
+      rtVehicles: createRealtimeVehicleStore(),
+      rtTripUpdates: createRealtimeTripUpdateStore(),
+      rtNow: () => 1_781_568_000,
+    });
+    await fetch(`${base}/rt/vehicles/veh-gps-tu`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        vehicleId: "bus-gps-tu",
+        latitude: 34.80002,
+        longitude: 137.40002,
+        routeId: "R1",
+      }),
+    });
+
+    const generated = await fetch(`${base}/rt/vehicles/veh-gps-tu/trip-update`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        zipBase64: staticGtfsZipBase64(),
+        atTime: "07:09:30",
+        delaySec: 90,
+        maxStopDistanceMeters: 100,
+        save: true,
+      }),
+    });
+    expect(generated.status).toBe(200);
+    const body = await generated.json();
+    expect(body.update.tripId).toBe("T1");
+    expect(body.update.stopTimeUpdates.map((stop: { stopId: string }) => stop.stopId)).toEqual(["S2"]);
+  });
+
   it("静的GTFSとprobeからtrip候補品質を評価できる", async () => {
     await restart({
       repository: openSpecLockRepository("/tmp/__rt_trip_match_eval_locks_unused.json"),

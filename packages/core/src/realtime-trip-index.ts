@@ -12,6 +12,12 @@ export interface StaticStopTime {
   departureSec?: number;
 }
 
+export interface StaticStopForRealtime {
+  stopId: string;
+  latitude?: number;
+  longitude?: number;
+}
+
 export interface StaticTripForRealtime {
   tripId: string;
   routeId: string;
@@ -26,6 +32,7 @@ export interface RealtimeTripIndex {
   trips: StaticTripForRealtime[];
   byTripId: Map<string, StaticTripForRealtime>;
   byRouteId: Map<string, StaticTripForRealtime[]>;
+  byStopId: Map<string, StaticStopForRealtime>;
 }
 
 export interface StaticTripDelayInput {
@@ -52,6 +59,11 @@ export interface RealtimeTripMatchInput {
   atTime: string | number;
   /** 指定時は、その停留所のstop_timeで時刻差を見る。 */
   atStopId?: string;
+  /** 指定時はroute上の最寄り停留所へ絞り込む。 */
+  latitude?: number;
+  longitude?: number;
+  /** 緯度経度で候補に含める最大停留所距離。既定300m。 */
+  maxStopDistanceMeters?: number;
   /** 候補に含める最大時刻差。既定30分。 */
   maxTimeDiffSec?: number;
 }
@@ -61,6 +73,7 @@ export interface RealtimeTripMatch {
   timeDiffSec: number;
   matchedTimeSec: number;
   matchedStopTime?: StaticStopTime;
+  matchedStopDistanceMeters?: number;
 }
 
 export interface MatchedTripDelayInput extends RealtimeTripMatchInput {
@@ -81,6 +94,7 @@ export interface RealtimeTripMatchProbeResult {
   candidates: RealtimeTripMatch[];
   bestTripId?: string;
   bestTimeDiffSec?: number;
+  matchedStopDistanceMeters?: number;
   matchedExpected?: boolean;
   status: "miss" | "unique" | "ambiguous";
 }
@@ -125,6 +139,17 @@ export interface StopProgressEstimate {
  * route/service/trip/stop_sequence を素直に引ける軽量な読み取り専用構造。
  */
 export function buildRealtimeTripIndex(feed: Feed): RealtimeTripIndex {
+  const byStopId = new Map<string, StaticStopForRealtime>();
+  for (const row of getRows(feed, "stops")) {
+    const stopId = (row["stop_id"] ?? "").trim();
+    if (!stopId) continue;
+    byStopId.set(stopId, {
+      stopId,
+      latitude: parseFiniteNumber(row["stop_lat"]),
+      longitude: parseFiniteNumber(row["stop_lon"]),
+    });
+  }
+
   const stopTimesByTripId = new Map<string, StaticStopTime[]>();
   for (const row of getRows(feed, "stop_times")) {
     const tripId = (row["trip_id"] ?? "").trim();
@@ -179,7 +204,7 @@ export function buildRealtimeTripIndex(feed: Feed): RealtimeTripIndex {
   }
   trips.sort((a, b) => a.tripId.localeCompare(b.tripId));
 
-  return { trips, byTripId, byRouteId };
+  return { trips, byTripId, byRouteId, byStopId };
 }
 
 /**
@@ -199,16 +224,26 @@ export function findRealtimeTripCandidates(
   }
 
   const routeTrips = index.byRouteId.get(routeId) ?? [];
+  const hasLocation = input.latitude !== undefined || input.longitude !== undefined;
+  const nearestStop = input.atStopId ? undefined : findNearestRouteStop(index, routeTrips, input);
+  if (hasLocation && !input.atStopId && !nearestStop) return [];
+  const atStopId = input.atStopId ?? nearestStop?.stopId;
   const matches: RealtimeTripMatch[] = [];
   for (const trip of routeTrips) {
     if (input.serviceId && trip.serviceId !== input.serviceId) continue;
     if (input.directionId !== undefined && trip.directionId !== input.directionId) continue;
-    for (const stopTime of comparableStopTimes(trip, input.atStopId)) {
+    for (const stopTime of comparableStopTimes(trip, atStopId)) {
       const matchedTimeSec = stopTime.departureSec ?? stopTime.arrivalSec;
       if (matchedTimeSec === undefined) continue;
       const timeDiffSec = Math.abs(matchedTimeSec - targetSec);
       if (timeDiffSec <= maxTimeDiffSec) {
-        matches.push({ trip, matchedStopTime: stopTime, matchedTimeSec, timeDiffSec });
+        matches.push({
+          trip,
+          matchedStopTime: stopTime,
+          matchedTimeSec,
+          timeDiffSec,
+          matchedStopDistanceMeters: nearestStop?.distanceMeters,
+        });
       }
     }
   }
@@ -261,6 +296,7 @@ export function evaluateRealtimeTripMatching(
       candidates,
       bestTripId: best?.trip.tripId,
       bestTimeDiffSec: best?.timeDiffSec,
+      matchedStopDistanceMeters: best?.matchedStopDistanceMeters,
       matchedExpected,
       status,
     };
@@ -430,6 +466,38 @@ function comparableStopTimes(trip: StaticTripForRealtime, atStopId: string | und
   return first ? [first] : [];
 }
 
+function findNearestRouteStop(
+  index: RealtimeTripIndex,
+  routeTrips: StaticTripForRealtime[],
+  input: Pick<RealtimeTripMatchInput, "latitude" | "longitude" | "maxStopDistanceMeters">,
+): { stopId: string; distanceMeters: number } | undefined {
+  if (input.latitude === undefined && input.longitude === undefined) return undefined;
+  if (input.latitude === undefined || input.longitude === undefined) {
+    throw new Error("latitude and longitude must be provided together");
+  }
+  if (!isValidLatLon(input.latitude, input.longitude)) {
+    throw new Error("latitude/longitude is out of range");
+  }
+  const maxStopDistanceMeters = input.maxStopDistanceMeters ?? 300;
+  if (!Number.isFinite(maxStopDistanceMeters) || maxStopDistanceMeters < 0) {
+    throw new Error("maxStopDistanceMeters must be a non-negative number of meters");
+  }
+
+  const routeStopIds = new Set<string>();
+  for (const trip of routeTrips) {
+    for (const stopTime of trip.stopTimes) routeStopIds.add(stopTime.stopId);
+  }
+
+  let best: { stopId: string; distanceMeters: number } | undefined;
+  for (const stopId of routeStopIds) {
+    const stop = index.byStopId.get(stopId);
+    if (!stop || stop.latitude === undefined || stop.longitude === undefined) continue;
+    const distanceMeters = haversineMeters(input.latitude, input.longitude, stop.latitude, stop.longitude);
+    if (!best || distanceMeters < best.distanceMeters) best = { stopId, distanceMeters };
+  }
+  return best && best.distanceMeters <= maxStopDistanceMeters ? best : undefined;
+}
+
 function representativeStopTimeSec(stop: StaticStopTime): number | undefined {
   return stop.departureSec ?? stop.arrivalSec;
 }
@@ -448,6 +516,31 @@ function parseGtfsTime(value: string | undefined): number | undefined {
   const trimmed = value?.trim();
   if (!trimmed) return undefined;
   return hmsToSec(trimmed) ?? undefined;
+}
+
+function parseFiniteNumber(value: string | undefined): number | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  const n = Number(trimmed);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function isValidLatLon(lat: number, lon: number): boolean {
+  return Number.isFinite(lat) && Number.isFinite(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+}
+
+function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const radius = 6_371_000;
+  const p1 = toRad(lat1);
+  const p2 = toRad(lat2);
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dLon / 2) ** 2;
+  return 2 * radius * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function toRad(value: number): number {
+  return (value * Math.PI) / 180;
 }
 
 function average(values: number[]): number {

@@ -34,6 +34,7 @@ interface TripMatchingEvaluation {
     matchedExpected?: boolean;
     status: "miss" | "unique" | "ambiguous";
     candidates?: Array<{ trip?: { tripId?: string }; timeDiffSec?: number }>;
+    matchedStopDistanceMeters?: number;
   }>;
 }
 
@@ -65,7 +66,7 @@ export function RealtimeVehiclesView() {
   const [tripUpdateAtTime, setTripUpdateAtTime] = useState("07:05:00");
   const [tripUpdateDelaySec, setTripUpdateDelaySec] = useState("60");
   const [matchProbeJson, setMatchProbeJson] = useState(
-    '[{"routeId":"R1","atTime":"07:05:00","expectedTripId":"T1","maxTimeDiffSec":1800}]',
+    '[{"routeId":"R1","atTime":"07:05:00","latitude":34.766,"longitude":137.385,"maxStopDistanceMeters":300,"expectedTripId":"T1","maxTimeDiffSec":1800}]',
   );
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -304,7 +305,7 @@ export function RealtimeVehiclesView() {
   const onDownloadMatchCsv = useCallback(() => {
     if (!matchEvaluation) return;
     const rows = [
-      ["status", "routeId", "serviceId", "directionId", "atTime", "atStopId", "expectedTripId", "bestTripId", "bestTimeDiffSec", "matchedExpected", "candidateCount"],
+      ["status", "routeId", "serviceId", "directionId", "atTime", "atStopId", "latitude", "longitude", "expectedTripId", "bestTripId", "bestTimeDiffSec", "matchedStopDistanceMeters", "matchedExpected", "candidateCount"],
       ...matchEvaluation.results.map((result) => [
         result.status,
         stringCell(result.probe.routeId),
@@ -312,9 +313,12 @@ export function RealtimeVehiclesView() {
         stringCell(result.probe.directionId),
         stringCell(result.probe.atTime),
         stringCell(result.probe.atStopId),
+        stringCell(result.probe.latitude),
+        stringCell(result.probe.longitude),
         stringCell(result.probe.expectedTripId),
         result.bestTripId ?? "",
         result.bestTimeDiffSec ?? "",
+        result.matchedStopDistanceMeters ?? "",
         result.matchedExpected ?? "",
         result.candidates?.length ?? 0,
       ]),
@@ -499,6 +503,7 @@ export function RealtimeVehiclesView() {
                     <th>expected</th>
                     <th>best</th>
                     <th>diff</th>
+                    <th>dist</th>
                     <th>candidates</th>
                   </tr>
                 </thead>
@@ -512,6 +517,7 @@ export function RealtimeVehiclesView() {
                       <td className="mono">{stringCell(result.probe.expectedTripId) || "-"}</td>
                       <td className="mono">{result.bestTripId ?? "-"}</td>
                       <td className="mono">{result.bestTimeDiffSec ?? "-"}</td>
+                      <td className="mono">{numberLabel(result.matchedStopDistanceMeters ?? null)}</td>
                       <td className="mono">{result.candidates?.length ?? 0}</td>
                     </tr>
                   ))}
@@ -551,7 +557,9 @@ function parseProbeCsv(text: string): Array<Record<string, string | number>> {
       const key = name.trim();
       const raw = row[index]?.trim() ?? "";
       if (!key || raw === "") return;
-      probe[key] = ["directionId", "maxTimeDiffSec"].includes(key) ? Number(raw) : raw;
+      probe[key] = ["directionId", "maxTimeDiffSec", "latitude", "longitude", "maxStopDistanceMeters"].includes(key)
+        ? Number(raw)
+        : raw;
     });
     return probe;
   });

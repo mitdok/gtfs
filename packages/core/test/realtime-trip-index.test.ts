@@ -86,6 +86,34 @@ describe("GTFS-RT TripUpdates static index", () => {
     expect(matches.map((match) => match.trip.tripId)).toEqual(["T2"]);
   });
 
+  it("緯度経度からroute上の最寄り停留所を推定してtrip候補を絞れる", () => {
+    const index = buildRealtimeTripIndex(sampleFeed());
+    const matches = findRealtimeTripCandidates(index, {
+      routeId: "R1",
+      serviceId: "weekday",
+      atTime: "07:04:30",
+      latitude: 34.76602,
+      longitude: 137.38502,
+      maxStopDistanceMeters: 50,
+      maxTimeDiffSec: 120,
+    });
+
+    expect(matches.map((match) => match.trip.tripId)).toEqual(["T1"]);
+    expect(matches[0]?.matchedStopTime?.stopId).toBe("S2");
+    expect(matches[0]?.matchedStopDistanceMeters).toBeLessThan(5);
+
+    expect(
+      findRealtimeTripCandidates(index, {
+        routeId: "R1",
+        atTime: "07:04:30",
+        latitude: 34.0,
+        longitude: 137.0,
+        maxStopDistanceMeters: 50,
+        maxTimeDiffSec: 120,
+      }),
+    ).toEqual([]);
+  });
+
   it("最も近いtrip候補から遅延TripUpdateを作る", () => {
     const index = buildRealtimeTripIndex(sampleFeed());
     const update = matchedTripDelayToTripUpdate(index, {

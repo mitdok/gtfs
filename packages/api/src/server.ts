@@ -186,6 +186,7 @@ interface VehicleTripUpdateRequest {
   directionId?: number;
   atStopId?: string;
   maxTimeDiffSec?: number;
+  maxStopDistanceMeters?: number;
   id?: string;
   save?: boolean;
 }
@@ -441,7 +442,10 @@ export function createApiServer(options: ApiOptions): Server {
               directionId: body.directionId,
               atTime: body.atTime,
               atStopId: body.atStopId,
+              latitude: vehicle.latitude,
+              longitude: vehicle.longitude,
               maxTimeDiffSec: body.maxTimeDiffSec,
+              maxStopDistanceMeters: body.maxStopDistanceMeters,
               delaySec: body.delaySec,
               timestamp,
               vehicleId: vehicle.vehicleId,
