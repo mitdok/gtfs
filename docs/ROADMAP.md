@@ -16,7 +16,7 @@
 | GTFS-JP v4 core | 約83% | import/export、v3→v4移行、v4検証、公開ゲート、検収判定、golden標準validator回帰、CI定義 | 実データ回帰、公開URL検証 |
 | Web編集 | MVP完了 | ZIP取込、新規作成、停留所/路線/便追加、検証、公開ゲート表示 | shape編集、運賃詳細、warning承認、公開ワークフロー |
 | API | MVP完了 | spec lockファイル永続化、HTTP検収、RT Alerts/Vehicles/TripUpdates配信 | DB永続化、認証、revision/publish/public URL |
-| GTFS-RT | 約88% / Beta手前 | ServiceAlerts、RT中継＋source運用UI、VehiclePositions地図デバッグ、TripUpdates core/API MVP、trip候補・進捗推定、車両位置連動MVP、候補評価JSON/CSV入力、鮮度SLO表示、stale policy、監査ログMVP、公開URL smoke、静的GTFS参照ID照合API/Web | revision切替運用、実データ評価 |
+| GTFS-RT | 約89% / Beta手前 | ServiceAlerts、RT中継＋source運用UI、VehiclePositions地図デバッグ、TripUpdates core/API MVP、trip候補・進捗推定、車両位置連動MVP、候補評価JSON/CSV入力/結果出力、鮮度SLO表示、stale policy、監査ログMVP、公開URL smoke、静的GTFS参照ID照合API/Web | revision切替運用、実データ評価 |
 | 運用品質 | 未完 | CLI検収、内部テスト、ロードマップ管理 | CI、公開URL smoke、監査ログ、実運用手順 |
 
 ## 2. 次の優先順位
@@ -43,7 +43,7 @@
 |----|------|----------|------|
 | P2-1 | RT Alerts WebをAPI保存へ接続 | ローカル保存でなくAPI CRUDを使って `.pb` 配信まで反映 | ✅ RT-1 |
 | P2-2 | VehiclePositions地図デバッグ表示 | 最新位置、age、route/trip候補をWebで確認できる | ✅ RT-3 |
-| P2-3 | TripUpdatesの実ソース評価 | 実ログから候補なし/一意/曖昧/正解一致率を計測 | ⏳ RT-4 評価API/Web＋JSON/CSV入力MVP |
+| P2-3 | TripUpdatesの実ソース評価 | 実ログから候補なし/一意/曖昧/正解一致率を計測 | ⏳ RT-4 評価API/Web＋JSON/CSV入力/結果出力MVP |
 | P2-4 | RT鮮度SLO監視 | TripUpdates/VehiclePositions 90秒、Alerts 10分の逸脱を検出 | ✅ RT-5 |
 | P2-5 | RT source運用UI | 外部GTFS-RT sourceの登録、poll、status、feed.pb確認をWebで実行できる | ✅ RT-2 |
 

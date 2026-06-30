@@ -17,6 +17,26 @@ interface VehicleDraft {
   tripId: string;
 }
 
+interface TripMatchingEvaluation {
+  total: number;
+  miss: number;
+  unique: number;
+  ambiguous: number;
+  expectedKnown: number;
+  expectedMatched: number;
+  expectedAccuracy: number | null;
+  averageBestTimeDiffSec: number | null;
+  maxBestTimeDiffSec: number | null;
+  results: Array<{
+    probe: Record<string, unknown>;
+    bestTripId?: string;
+    bestTimeDiffSec?: number;
+    matchedExpected?: boolean;
+    status: "miss" | "unique" | "ambiguous";
+    candidates?: Array<{ trip?: { tripId?: string }; timeDiffSec?: number }>;
+  }>;
+}
+
 const DEFAULT_DRAFT: VehicleDraft = {
   id: "vehicle-1",
   vehicleId: "bus-1",
@@ -37,8 +57,9 @@ export function RealtimeVehiclesView() {
   const [draft, setDraft] = useState<VehicleDraft>(DEFAULT_DRAFT);
   const [vehicles, setVehicles] = useState<StoredVehiclePosition[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [lastPreview, setLastPreview] = useState<Record<string, unknown> | null>(null);
-  const [tripUpdatePreview, setTripUpdatePreview] = useState<Record<string, unknown> | null>(null);
+  const [lastPreview, setLastPreview] = useState<unknown | null>(null);
+  const [tripUpdatePreview, setTripUpdatePreview] = useState<unknown | null>(null);
+  const [matchEvaluation, setMatchEvaluation] = useState<TripMatchingEvaluation | null>(null);
   const [gtfsZipBase64, setGtfsZipBase64] = useState<string>("");
   const [gtfsZipName, setGtfsZipName] = useState<string>("");
   const [tripUpdateAtTime, setTripUpdateAtTime] = useState("07:05:00");
@@ -236,6 +257,7 @@ export function RealtimeVehiclesView() {
         }),
       });
       setTripUpdatePreview(body);
+      setMatchEvaluation(null);
       setStatus("TripUpdateを生成して保存しました");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -261,17 +283,44 @@ export function RealtimeVehiclesView() {
       return;
     }
     try {
-      const body = await apiJson<Record<string, unknown>>("/rt/trip-matching/evaluate", {
+      const body = await apiJson<TripMatchingEvaluation>("/rt/trip-matching/evaluate", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ zipBase64: gtfsZipBase64, probes }),
       });
       setTripUpdatePreview(body);
-      setStatus("trip候補品質を評価しました");
+      setMatchEvaluation(body);
+      setStatus(`trip候補品質を評価しました: total ${body.total} / miss ${body.miss} / ambiguous ${body.ambiguous}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
   }, [gtfsZipBase64, matchProbeJson]);
+
+  const onDownloadMatchJson = useCallback(() => {
+    if (!matchEvaluation) return;
+    downloadText("trip-matching-evaluation.json", JSON.stringify(matchEvaluation, null, 2), "application/json");
+  }, [matchEvaluation]);
+
+  const onDownloadMatchCsv = useCallback(() => {
+    if (!matchEvaluation) return;
+    const rows = [
+      ["status", "routeId", "serviceId", "directionId", "atTime", "atStopId", "expectedTripId", "bestTripId", "bestTimeDiffSec", "matchedExpected", "candidateCount"],
+      ...matchEvaluation.results.map((result) => [
+        result.status,
+        stringCell(result.probe.routeId),
+        stringCell(result.probe.serviceId),
+        stringCell(result.probe.directionId),
+        stringCell(result.probe.atTime),
+        stringCell(result.probe.atStopId),
+        stringCell(result.probe.expectedTripId),
+        result.bestTripId ?? "",
+        result.bestTimeDiffSec ?? "",
+        result.matchedExpected ?? "",
+        result.candidates?.length ?? 0,
+      ]),
+    ];
+    downloadText("trip-matching-evaluation.csv", rows.map((row) => row.map(csvCell).join(",")).join("\n"), "text/csv");
+  }, [matchEvaluation]);
 
   return (
     <div className="rt-vehicles-view">
@@ -372,6 +421,8 @@ export function RealtimeVehiclesView() {
             </label>
             <div className="rt-actions">
               <button onClick={onEvaluateTripMatching}>候補品質を評価</button>
+              <button onClick={onDownloadMatchJson} disabled={!matchEvaluation}>JSON出力</button>
+              <button onClick={onDownloadMatchCsv} disabled={!matchEvaluation}>CSV出力</button>
             </div>
           </div>
         </div>
@@ -498,6 +549,25 @@ function parseCsvRows(text: string): string[][] {
   row.push(cell);
   rows.push(row);
   return rows;
+}
+
+function downloadText(filename: string, text: string, type: string) {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function csvCell(value: unknown): string {
+  const text = String(value ?? "");
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function stringCell(value: unknown): string {
+  return value === undefined || value === null ? "" : String(value);
 }
 
 function upsertVehicle(vehicles: StoredVehiclePosition[], vehicle: StoredVehiclePosition): StoredVehiclePosition[] {
