@@ -100,6 +100,27 @@ describe("RT-2 poller（fetch注入）", () => {
     expect((await svc.poll("s")).outcome).toBe("failed");
     expect(svc.store.metrics("s")!.consecutiveFailures).toBe(2);
   });
+
+  it("disabledまたはactiveFrom前のsourceはpollをskipする", async () => {
+    const svc = createRtRelayService({
+      fetch: async () => okResponse(alertFeed(1_000)),
+      now: () => 1_000,
+      initialSources: [
+        { id: "disabled", url: "http://x/a.pb", feedType: "service_alerts", pollIntervalSec: 30, enabled: false },
+        {
+          id: "future",
+          url: "http://x/b.pb",
+          feedType: "service_alerts",
+          pollIntervalSec: 30,
+          activeFrom: 2_000,
+        },
+      ],
+    });
+
+    expect(await svc.poll("disabled")).toMatchObject({ outcome: "skipped", reason: "disabled" });
+    expect(await svc.poll("future")).toMatchObject({ outcome: "skipped", reason: "not_active_yet" });
+    expect(svc.store.serve("future", 1_000).ok).toBe(false);
+  });
 });
 
 describe("RT-2 中継エンドポイント", () => {

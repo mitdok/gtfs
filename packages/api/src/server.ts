@@ -642,6 +642,7 @@ export function createApiServer(options: ApiOptions): Server {
             pollIntervalSec: body.pollIntervalSec ?? 30,
             headers: body.headers,
             enabled: body.enabled,
+            activeFrom: body.activeFrom,
             stalePolicy: body.stalePolicy ?? "warn",
             gtfsRevision: body.gtfsRevision,
           };

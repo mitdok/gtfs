@@ -25,10 +25,12 @@ export type RtFetch = (
 
 export interface PollResult {
   sourceId: string;
-  outcome: "ingested" | "not_modified" | "failed";
+  outcome: "ingested" | "not_modified" | "failed" | "skipped";
   status?: number;
   error?: string;
   summary?: RtFeedSummary;
+  reason?: "disabled" | "not_active_yet";
+  activeFrom?: number | string;
 }
 
 export interface RtRelayService {
@@ -59,6 +61,14 @@ export function createRtRelayService(options: RtRelayServiceOptions = {}): RtRel
     const source = store.getSource(sourceId);
     if (!source) throw new Error(`unknown rt source: ${sourceId}`);
     if (!fetchImpl) throw new Error("fetch is not available; inject options.fetch");
+    const at = now();
+    if (source.enabled === false) {
+      return { sourceId, outcome: "skipped", reason: "disabled" };
+    }
+    const activeFromSec = source.activeFrom === undefined ? undefined : parseActiveFrom(source.activeFrom);
+    if (activeFromSec !== undefined && at < activeFromSec) {
+      return { sourceId, outcome: "skipped", reason: "not_active_yet", activeFrom: source.activeFrom };
+    }
 
     const headers: Record<string, string> = { ...(source.headers ?? {}) };
     const cond = conditional.get(sourceId);
@@ -67,7 +77,6 @@ export function createRtRelayService(options: RtRelayServiceOptions = {}): RtRel
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
-    const at = now();
     let res: RtFetchResponse;
     try {
       res = await fetchImpl(source.url, { headers, signal: controller.signal });
@@ -108,4 +117,16 @@ export function createRtRelayService(options: RtRelayServiceOptions = {}): RtRel
   }
 
   return { store, poll };
+}
+
+function parseActiveFrom(value: number | string): number {
+  if (typeof value === "number") {
+    if (!Number.isFinite(value) || value < 0) throw new Error("RtSource.activeFrom must be a non-negative Unix second");
+    return Math.floor(value);
+  }
+  const n = Number(value);
+  if (Number.isFinite(n) && n >= 0) return Math.floor(n);
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms)) throw new Error("RtSource.activeFrom must be a Unix second or ISO timestamp");
+  return Math.floor(ms / 1000);
 }

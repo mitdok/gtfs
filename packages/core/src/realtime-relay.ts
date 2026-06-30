@@ -32,6 +32,8 @@ export interface RtSource {
   /** 取得時に付与する認証等のヘッダ。 */
   headers?: Record<string, string>;
   enabled?: boolean;
+  /** 指定時刻（Unix秒/ISO文字列）以降にpoll対象にする。revision切替予約用。 */
+  activeFrom?: number | string;
   /** stale時の再配信方針。既定は warn（配信継続＋stale header）。 */
   stalePolicy?: RtStalePolicy;
   /** 静的GTFS revision との紐付け（RT-5-5 切替整合用）。 */

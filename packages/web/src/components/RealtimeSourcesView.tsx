@@ -10,6 +10,7 @@ interface RtSource {
   feedType: RtFeedType;
   pollIntervalSec: number;
   enabled?: boolean;
+  activeFrom?: number | string;
   stalePolicy?: RtStalePolicy;
   gtfsRevision?: string;
 }
@@ -38,9 +39,10 @@ interface RtSourceStatus {
 
 interface PollResult {
   sourceId: string;
-  outcome: "ingested" | "not_modified" | "failed";
+  outcome: "ingested" | "not_modified" | "failed" | "skipped";
   status?: number;
   error?: string;
+  reason?: "disabled" | "not_active_yet";
 }
 
 interface SourceStaticCompatResult {
@@ -69,6 +71,8 @@ interface SourceDraft {
   url: string;
   feedType: RtFeedType;
   pollIntervalSec: string;
+  enabled: boolean;
+  activeFrom: string;
   stalePolicy: RtStalePolicy;
   gtfsRevision: string;
 }
@@ -78,6 +82,8 @@ const DEFAULT_DRAFT: SourceDraft = {
   url: "",
   feedType: "service_alerts",
   pollIntervalSec: "30",
+  enabled: true,
+  activeFrom: "",
   stalePolicy: "warn",
   gtfsRevision: "",
 };
@@ -101,7 +107,8 @@ export function RealtimeSourcesView() {
       url: draft.url.trim(),
       feedType: draft.feedType,
       pollIntervalSec: Number(draft.pollIntervalSec),
-      enabled: true,
+      enabled: draft.enabled,
+      ...(draft.activeFrom.trim() ? { activeFrom: draft.activeFrom.trim() } : {}),
       stalePolicy: draft.stalePolicy,
       ...(draft.gtfsRevision.trim() ? { gtfsRevision: draft.gtfsRevision.trim() } : {}),
     };
@@ -266,6 +273,17 @@ export function RealtimeSourcesView() {
             <input value={draft.pollIntervalSec} onChange={(e) => update("pollIntervalSec", e.target.value)} />
           </label>
           <label>
+            active from
+            <input value={draft.activeFrom} onChange={(e) => update("activeFrom", e.target.value)} placeholder="Unix秒 or ISO" />
+          </label>
+          <label>
+            enabled
+            <select value={String(draft.enabled)} onChange={(e) => update("enabled", e.target.value === "true")}>
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          </label>
+          <label>
             stale policy
             <select value={draft.stalePolicy} onChange={(e) => update("stalePolicy", e.target.value as RtStalePolicy)}>
               {STALE_POLICIES.map((policy) => (
@@ -313,6 +331,7 @@ export function RealtimeSourcesView() {
                 <th>type</th>
                 <th>status</th>
                 <th>policy</th>
+                <th>active</th>
                 <th>age</th>
                 <th>entities</th>
                 <th>error</th>
@@ -328,6 +347,7 @@ export function RealtimeSourcesView() {
                     <td className="mono">{source.feedType}</td>
                     <td>{sourceStatus ? (sourceStatus.stale ? "stale" : "fresh") : "no data"}</td>
                     <td className="mono">{source.stalePolicy ?? "warn"}</td>
+                    <td className="mono">{source.enabled === false ? "disabled" : source.activeFrom ?? "-"}</td>
                     <td className="mono">{sourceStatus?.ageSec === undefined ? "-" : `${sourceStatus.ageSec}s`}</td>
                     <td className="mono">{sourceStatus?.summary?.entityCount ?? sourceStatus?.metrics.entityCount ?? 0}</td>
                     <td>{sourceStatus?.metrics.lastError ?? ""}</td>
@@ -352,6 +372,7 @@ export function RealtimeSourcesView() {
         {lastPoll && (
           <div className="rt-info">
             poll: {lastPoll.sourceId} / {lastPoll.outcome}
+            {lastPoll.reason ? ` / ${lastPoll.reason}` : ""}
             {lastPoll.error ? ` / ${lastPoll.error}` : ""}
           </div>
         )}
