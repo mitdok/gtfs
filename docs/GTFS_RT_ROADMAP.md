@@ -4,7 +4,7 @@
 
 本書はGTFS StudioにGTFS Realtime（GTFS-RT）を追加するための実装ロードマップ、課題、達成管理表である。静的GTFS-JP v4生成とは別フェーズとして扱い、まず手動Alertと外部GTFS-RT中継から始め、車両位置・遅延予測の自動生成へ段階的に進める。
 
-総合進捗: **91%**
+総合進捗: **92%**
 
 全体優先順位と横断的な確認事項は [`ROADMAP.md`](./ROADMAP.md) に集約する。
 
@@ -34,7 +34,7 @@
 | RT-1 | ServiceAlerts最小実装 | 手動Alert入力モデル、protobuf生成、HTTP配信 | ✅ core store＋API pb配信＋Web API接続完了 |
 | RT-2 | 外部GTFS-RT中継 | 既存 `.pb` の取得、検証、キャッシュ、再配信 | ✅ core relay＋api poller＋Web source運用UI完了 |
 | RT-3 | VehiclePositions取込 | GPS/外部JSON入力、車両位置Feed生成 | ✅ core store＋API配信・認証MVP＋Web地図デバッグ完了 |
-| RT-4 | TripUpdates生成 | 静的GTFSとの突合、遅延算出、StopTimeUpdate生成 | ⏳ core store＋API配信＋静的index・trip候補・進捗推定・車両位置連動・GPS最寄り停留所絞り込み・候補評価API/Web MVP完了 / 実データ評価未 |
+| RT-4 | TripUpdates生成 | 静的GTFSとの突合、遅延算出、StopTimeUpdate生成 | ⏳ core store＋API配信＋静的index・trip候補・block_id/GPS絞り込み・進捗推定・車両位置連動・候補評価API/Web MVP完了 / 実データ評価未 |
 | RT-5 | 運用品質 | 監視、鮮度SLO、公開URL検証、Google申請前チェック | ⏳ 鮮度SLO表示＋stale policy＋監査ログMVP＋公開URL smoke＋静的GTFS参照ID照合API/Web完了 / revision切替運用未 |
 
 ## 3. 実装タスク管理
@@ -78,7 +78,7 @@
 | ID | タスク | 受入基準 | 状態 |
 |----|--------|----------|------|
 | RT-4-1 | 静的GTFS index | service_id/trip_id/route_id/stop_timesを高速参照できる | ✅ core MVP |
-| RT-4-2 | tripマッチング | route/運用番号/時刻/位置から候補tripを推定できる | ⏳ route/time/stop/GPS最寄り停留所＋車両trip_id連動MVP完了 / 運用番号未 |
+| RT-4-2 | tripマッチング | route/運用番号/時刻/位置から候補tripを推定できる | ✅ route/time/stop/block_id/GPS最寄り停留所＋車両trip_id連動MVP |
 | RT-4-3 | stop進捗推定 | 現在/次停留所と遅延秒を算出できる | ✅ 静的時刻MVP |
 | RT-4-4 | StopTimeUpdate生成 | arrival/departure delay/timeを出力できる | ✅ core/API MVP |
 | RT-4-5 | 運休・途中打切 | schedule_relationshipを仕様版に従って表現 | ✅ core/API MVP |

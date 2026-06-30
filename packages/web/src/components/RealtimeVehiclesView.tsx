@@ -66,7 +66,7 @@ export function RealtimeVehiclesView() {
   const [tripUpdateAtTime, setTripUpdateAtTime] = useState("07:05:00");
   const [tripUpdateDelaySec, setTripUpdateDelaySec] = useState("60");
   const [matchProbeJson, setMatchProbeJson] = useState(
-    '[{"routeId":"R1","atTime":"07:05:00","latitude":34.766,"longitude":137.385,"maxStopDistanceMeters":300,"expectedTripId":"T1","maxTimeDiffSec":1800}]',
+    '[{"routeId":"R1","blockId":"B1","atTime":"07:05:00","latitude":34.766,"longitude":137.385,"maxStopDistanceMeters":300,"expectedTripId":"T1","maxTimeDiffSec":1800}]',
   );
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -305,12 +305,13 @@ export function RealtimeVehiclesView() {
   const onDownloadMatchCsv = useCallback(() => {
     if (!matchEvaluation) return;
     const rows = [
-      ["status", "routeId", "serviceId", "directionId", "atTime", "atStopId", "latitude", "longitude", "expectedTripId", "bestTripId", "bestTimeDiffSec", "matchedStopDistanceMeters", "matchedExpected", "candidateCount"],
+      ["status", "routeId", "serviceId", "directionId", "blockId", "atTime", "atStopId", "latitude", "longitude", "expectedTripId", "bestTripId", "bestTimeDiffSec", "matchedStopDistanceMeters", "matchedExpected", "candidateCount"],
       ...matchEvaluation.results.map((result) => [
         result.status,
         stringCell(result.probe.routeId),
         stringCell(result.probe.serviceId),
         stringCell(result.probe.directionId),
+        stringCell(result.probe.blockId),
         stringCell(result.probe.atTime),
         stringCell(result.probe.atStopId),
         stringCell(result.probe.latitude),
@@ -498,6 +499,7 @@ export function RealtimeVehiclesView() {
                   <tr>
                     <th>status</th>
                     <th>route</th>
+                    <th>block</th>
                     <th>at</th>
                     <th>stop</th>
                     <th>expected</th>
@@ -512,6 +514,7 @@ export function RealtimeVehiclesView() {
                     <tr key={index} className={`rt-match-${result.status}`}>
                       <td>{result.status}</td>
                       <td className="mono">{stringCell(result.probe.routeId) || "-"}</td>
+                      <td className="mono">{stringCell(result.probe.blockId) || "-"}</td>
                       <td className="mono">{stringCell(result.probe.atTime) || "-"}</td>
                       <td className="mono">{stringCell(result.probe.atStopId) || "-"}</td>
                       <td className="mono">{stringCell(result.probe.expectedTripId) || "-"}</td>

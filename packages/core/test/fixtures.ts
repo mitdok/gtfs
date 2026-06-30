@@ -26,9 +26,9 @@ export const SAMPLE_FILES: Record<string, string> = {
   ].join("\n"),
 
   "trips.txt": [
-    "route_id,service_id,trip_id,trip_headsign",
-    "R1,weekday,T1,中央病院",
-    "R1,weekday,T2,中央病院",
+    "route_id,service_id,trip_id,trip_headsign,block_id",
+    "R1,weekday,T1,中央病院,B1",
+    "R1,weekday,T2,中央病院,B2",
     "",
   ].join("\n"),
 

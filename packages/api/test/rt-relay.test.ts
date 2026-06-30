@@ -51,7 +51,7 @@ function staticGtfsZipBase64(): string {
     "agency.txt": "agency_id,agency_name,agency_url,agency_timezone\na,Agency,https://example.com,Asia/Tokyo\n",
     "stops.txt": "stop_id,stop_name,stop_lat,stop_lon\nS1,One,34.7,137.3\nS2,Two,34.8,137.4\n",
     "routes.txt": "route_id,agency_id,route_short_name,route_long_name,route_type\nR1,a,1,Route,3\n",
-    "trips.txt": "route_id,service_id,trip_id\nR1,weekday,T1\n",
+    "trips.txt": "route_id,service_id,trip_id,block_id\nR1,weekday,T1,B1\n",
     "stop_times.txt": "trip_id,arrival_time,departure_time,stop_id,stop_sequence\nT1,07:00:00,07:00:00,S1,1\nT1,07:10:00,07:10:00,S2,2\n",
     "calendar.txt": "service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date\nweekday,1,1,1,1,1,0,0,20260401,20261231\n",
   })) {
@@ -492,6 +492,7 @@ describe("RT-3 VehiclePositions API", () => {
         zipBase64: staticGtfsZipBase64(),
         atTime: "07:09:30",
         delaySec: 90,
+        blockId: "B1",
         maxStopDistanceMeters: 100,
         save: true,
       }),

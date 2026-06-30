@@ -22,6 +22,7 @@ describe("GTFS-RT TripUpdates static index", () => {
 
     expect(index.trips.map((trip) => trip.tripId)).toEqual(["T1", "T2"]);
     expect(index.byTripId.get("T1")?.routeId).toBe("R1");
+    expect(index.byTripId.get("T1")?.blockId).toBe("B1");
     expect(index.byRouteId.get("R1")?.map((trip) => trip.tripId)).toEqual(["T1", "T2"]);
     expect(index.byTripId.get("T1")?.stopTimes.map((stop) => stop.stopSequence)).toEqual([1, 2, 3]);
   });
@@ -112,6 +113,19 @@ describe("GTFS-RT TripUpdates static index", () => {
         maxTimeDiffSec: 120,
       }),
     ).toEqual([]);
+  });
+
+  it("block_idでtrip候補を絞れる", () => {
+    const index = buildRealtimeTripIndex(sampleFeed());
+    const matches = findRealtimeTripCandidates(index, {
+      routeId: "R1",
+      blockId: "B2",
+      atTime: "25:04:30",
+      atStopId: "S2",
+      maxTimeDiffSec: 120,
+    });
+
+    expect(matches.map((match) => match.trip.tripId)).toEqual(["T2"]);
   });
 
   it("最も近いtrip候補から遅延TripUpdateを作る", () => {

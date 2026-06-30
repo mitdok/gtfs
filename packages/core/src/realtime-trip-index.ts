@@ -25,6 +25,7 @@ export interface StaticTripForRealtime {
   tripHeadsign?: string;
   directionId?: number;
   shapeId?: string;
+  blockId?: string;
   stopTimes: StaticStopTime[];
 }
 
@@ -55,6 +56,8 @@ export interface RealtimeTripMatchInput {
   serviceId?: string;
   /** 指定時は該当direction_idに限定する。 */
   directionId?: number;
+  /** 指定時は該当block_idに限定する。 */
+  blockId?: string;
   /** GTFS時刻（例: 07:05:00 / 25:05:00）またはサービス日からの秒。 */
   atTime: string | number;
   /** 指定時は、その停留所のstop_timeで時刻差を見る。 */
@@ -190,6 +193,7 @@ export function buildRealtimeTripIndex(feed: Feed): RealtimeTripIndex {
       tripHeadsign: nonEmpty(row["trip_headsign"]),
       directionId: parseNonNegativeInteger(row["direction_id"]),
       shapeId: nonEmpty(row["shape_id"]),
+      blockId: nonEmpty(row["block_id"]),
       stopTimes,
     };
     trips.push(trip);
@@ -232,6 +236,7 @@ export function findRealtimeTripCandidates(
   for (const trip of routeTrips) {
     if (input.serviceId && trip.serviceId !== input.serviceId) continue;
     if (input.directionId !== undefined && trip.directionId !== input.directionId) continue;
+    if (input.blockId && trip.blockId !== input.blockId) continue;
     for (const stopTime of comparableStopTimes(trip, atStopId)) {
       const matchedTimeSec = stopTime.departureSec ?? stopTime.arrivalSec;
       if (matchedTimeSec === undefined) continue;
