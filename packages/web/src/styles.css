@@ -190,6 +190,16 @@ tr.warning td:first-child { color: #b07d10; font-weight: 600; }
   font: inherit; color: #222; background: #fff;
 }
 .rt-match-eval textarea { min-height: 96px; resize: vertical; }
+.rt-match-results { display: grid; gap: 12px; }
+.rt-match-summary { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.rt-match-summary div { border: 1px solid #d0d7de; border-radius: 6px; padding: 8px; background: #f6f8fa; }
+.rt-match-summary strong { display: block; font-size: 18px; line-height: 1.2; }
+.rt-match-summary span { display: block; margin-top: 3px; font-size: 11px; color: #57606a; }
+.rt-match-table-wrap { max-height: 260px; overflow: auto; border: 1px solid #d0d7de; }
+.rt-match-table-wrap table { margin: 0; }
+.rt-match-miss td:first-child { color: #d7263d; font-weight: 700; }
+.rt-match-ambiguous td:first-child { color: #b07d10; font-weight: 700; }
+.rt-match-unique td:first-child { color: #2ea043; font-weight: 700; }
 .rt-sources-view {
   flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(430px, 0.8fr) 1.2fr;
   grid-template-rows: auto minmax(220px, 1fr); gap: 16px; padding: 16px; background: #fff; overflow: auto;
@@ -218,6 +228,7 @@ tr.warning td:first-child { color: #b07d10; font-weight: 600; }
   .rt-sources-view { grid-template-columns: 1fr; grid-template-rows: auto auto auto; }
   .rt-source-list, .rt-source-preview { grid-column: auto; grid-row: auto; }
   .rt-smoke-view { grid-template-columns: 1fr; }
+  .rt-match-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* 新規GTFS作成 */

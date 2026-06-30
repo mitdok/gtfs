@@ -478,7 +478,51 @@ export function RealtimeVehiclesView() {
 
       <section className="rt-preview rt-vehicle-preview">
         <h3>VehiclePositions preview</h3>
-        {tripUpdatePreview || lastPreview ? (
+        {matchEvaluation ? (
+          <div className="rt-match-results">
+            <div className="rt-match-summary">
+              <div><strong>{matchEvaluation.total}</strong><span>total</span></div>
+              <div><strong>{matchEvaluation.unique}</strong><span>unique</span></div>
+              <div><strong>{matchEvaluation.ambiguous}</strong><span>ambiguous</span></div>
+              <div><strong>{matchEvaluation.miss}</strong><span>miss</span></div>
+              <div><strong>{percentLabel(matchEvaluation.expectedAccuracy)}</strong><span>accuracy</span></div>
+              <div><strong>{numberLabel(matchEvaluation.averageBestTimeDiffSec)}</strong><span>avg diff sec</span></div>
+            </div>
+            <div className="rt-match-table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>status</th>
+                    <th>route</th>
+                    <th>at</th>
+                    <th>stop</th>
+                    <th>expected</th>
+                    <th>best</th>
+                    <th>diff</th>
+                    <th>candidates</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {matchEvaluation.results.slice(0, 100).map((result, index) => (
+                    <tr key={index} className={`rt-match-${result.status}`}>
+                      <td>{result.status}</td>
+                      <td className="mono">{stringCell(result.probe.routeId) || "-"}</td>
+                      <td className="mono">{stringCell(result.probe.atTime) || "-"}</td>
+                      <td className="mono">{stringCell(result.probe.atStopId) || "-"}</td>
+                      <td className="mono">{stringCell(result.probe.expectedTripId) || "-"}</td>
+                      <td className="mono">{result.bestTripId ?? "-"}</td>
+                      <td className="mono">{result.bestTimeDiffSec ?? "-"}</td>
+                      <td className="mono">{result.candidates?.length ?? 0}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {matchEvaluation.results.length > 100 && (
+              <p className="hint">先頭100件のみ表示しています。全件はCSV/JSON出力で確認できます。</p>
+            )}
+          </div>
+        ) : tripUpdatePreview || lastPreview ? (
           <pre>{JSON.stringify(tripUpdatePreview ?? lastPreview, null, 2)}</pre>
         ) : (
           <p className="hint">vehicles.pb 出力またはTripUpdate生成後に結果を表示します。</p>
@@ -568,6 +612,14 @@ function csvCell(value: unknown): string {
 
 function stringCell(value: unknown): string {
   return value === undefined || value === null ? "" : String(value);
+}
+
+function percentLabel(value: number | null): string {
+  return value === null ? "-" : `${Math.round(value * 1000) / 10}%`;
+}
+
+function numberLabel(value: number | null): string {
+  return value === null ? "-" : String(Math.round(value * 10) / 10);
 }
 
 function upsertVehicle(vehicles: StoredVehiclePosition[], vehicle: StoredVehiclePosition): StoredVehiclePosition[] {
