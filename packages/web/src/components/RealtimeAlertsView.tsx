@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ServiceAlertInput, StoredServiceAlert } from "@gtfs-studio/core/realtime";
+import { API_BASE, apiJson } from "../lib/api";
 
 const CAUSES = [
   "UNKNOWN_CAUSE",
@@ -73,6 +74,8 @@ export function RealtimeAlertsView() {
   const [alerts, setAlerts] = useState<StoredServiceAlert[]>([]);
   const [lastPreview, setLastPreview] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [apiAvailable, setApiAvailable] = useState<boolean | null>(null);
 
   const input = useMemo((): ServiceAlertInput => {
     const informedEntities = [];
@@ -105,6 +108,26 @@ export function RealtimeAlertsView() {
     setDraft((current) => ({ ...current, [key]: value }));
   }, []);
 
+  const fetchAlerts = useCallback(async () => {
+    setError(null);
+    setStatus("APIからAlertを読み込み中...");
+    try {
+      const body = await apiJson<{ alerts: StoredServiceAlert[] }>("/rt/alerts");
+      setAlerts(body.alerts);
+      setDraft((current) => ({ ...current, id: nextAlertId(body.alerts) }));
+      setApiAvailable(true);
+      setStatus(`API同期済み: ${body.alerts.length}件`);
+    } catch (e) {
+      setApiAvailable(false);
+      setStatus("API未接続: 画面内だけでprotobuf生成できます");
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchAlerts();
+  }, [fetchAlerts]);
+
   const generate = useCallback(async (sourceAlerts: ServiceAlertInput[]) => {
     setError(null);
     try {
@@ -121,26 +144,63 @@ export function RealtimeAlertsView() {
     }
   }, []);
 
+  const previewBytes = useCallback(async (bytes: Uint8Array) => {
+    const { decodeRealtimeFeed, realtimeFeedToObject } = await import("@gtfs-studio/core/realtime");
+    setLastPreview(realtimeFeedToObject(decodeRealtimeFeed(bytes)));
+  }, []);
+
   const onSave = useCallback(async () => {
     setError(null);
+    setStatus(null);
     try {
+      if (apiAvailable !== false) {
+        const saved = await apiJson<StoredServiceAlert>("/rt/alerts", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(input),
+        });
+        const nextAlerts = upsertAlert(alerts, saved);
+        setAlerts(nextAlerts);
+        setDraft((current) => ({ ...current, id: nextAlertId(nextAlerts) }));
+        setApiAvailable(true);
+        setStatus("APIへ保存しました");
+        return;
+      }
+
       const { createRealtimeAlertStore } = await import("@gtfs-studio/core/realtime");
       const store = createRealtimeAlertStore(alerts);
       const saved = store.upsert(input);
-      setAlerts(store.list());
-      setDraft((current) => ({ ...current, id: nextAlertId([...alerts, saved]) }));
+      const nextAlerts = store.list();
+      setAlerts(nextAlerts);
+      setDraft((current) => ({ ...current, id: nextAlertId(nextAlerts) }));
+      setStatus("ローカルに保存しました");
     } catch (e) {
+      setApiAvailable(false);
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, [alerts, input]);
+  }, [alerts, apiAvailable, input]);
 
   const onPreview = useCallback(async () => {
     await generate([input]);
   }, [generate, input]);
 
   const onDownload = useCallback(async () => {
-    const sourceAlerts = alerts.length > 0 ? alerts : [input];
-    const bytes = await generate(sourceAlerts);
+    let bytes: Uint8Array | null = null;
+    if (apiAvailable) {
+      setError(null);
+      try {
+        const response = await fetch(`${API_BASE}/rt/alerts.pb`);
+        if (!response.ok) throw new Error(await response.text());
+        bytes = new Uint8Array(await response.arrayBuffer());
+        await previewBytes(bytes);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+        return;
+      }
+    } else {
+      const sourceAlerts = alerts.length > 0 ? alerts : [input];
+      bytes = await generate(sourceAlerts);
+    }
     if (!bytes) return;
     const blob = new Blob([bytes as BlobPart], { type: "application/x-protobuf" });
     const url = URL.createObjectURL(blob);
@@ -149,10 +209,34 @@ export function RealtimeAlertsView() {
     a.download = "alerts.pb";
     a.click();
     URL.revokeObjectURL(url);
-  }, [alerts, generate, input]);
+  }, [alerts, apiAvailable, generate, input, previewBytes]);
 
-  const onRemove = useCallback((id: string) => {
+  const onRemove = useCallback(async (id: string) => {
+    setError(null);
+    setStatus(null);
+    if (apiAvailable) {
+      try {
+        await apiJson(`/rt/alerts/${encodeURIComponent(id)}`, { method: "DELETE" });
+        setAlerts((current) => current.filter((alert) => alert.id !== id));
+        setStatus("APIから削除しました");
+        return;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+        return;
+      }
+    }
     setAlerts((current) => current.filter((alert) => alert.id !== id));
+    setStatus("ローカルから削除しました");
+  }, [apiAvailable]);
+
+  const onRefresh = useCallback(() => {
+    void fetchAlerts();
+  }, [fetchAlerts]);
+
+  const onForceLocal = useCallback(() => {
+    setApiAvailable(false);
+    setStatus("ローカル編集に切り替えました");
+    setError(null);
   }, []);
 
   return (
@@ -245,12 +329,18 @@ export function RealtimeAlertsView() {
           </label>
         </div>
         <div className="rt-actions">
+          <span className={apiAvailable ? "rt-status ok" : "rt-status"}>
+            {apiAvailable ? `API: ${API_BASE}` : "ローカル"}
+          </span>
+          <button onClick={onRefresh}>API再読込</button>
+          <button onClick={onForceLocal}>ローカル編集</button>
           <button onClick={onSave}>Alertを保存</button>
           <button onClick={onPreview}>protobufを検証</button>
           <button className="primary" onClick={onDownload}>
             alerts.pb を出力
           </button>
         </div>
+        {status && <div className="rt-info">{status}</div>}
         {error && <div className="rt-error">{error}</div>}
       </section>
 
@@ -296,6 +386,12 @@ export function RealtimeAlertsView() {
       </section>
     </div>
   );
+}
+
+function upsertAlert(alerts: StoredServiceAlert[], alert: StoredServiceAlert): StoredServiceAlert[] {
+  const next = alerts.filter((current) => current.id !== alert.id);
+  next.push(alert);
+  return next.sort((a, b) => a.id.localeCompare(b.id));
 }
 
 function entityLabel(entity: ServiceAlertInput["informedEntities"][number]): string {

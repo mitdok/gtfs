@@ -10,7 +10,7 @@ import { StopsView } from "./components/StopsView";
 import { TimetableView } from "./components/TimetableView";
 import { ValidationView } from "./components/ValidationView";
 import { ReleaseGateView } from "./components/ReleaseGateView";
-import { RealtimeAlertsView } from "./components/RealtimeAlertsView";
+import { RealtimeView } from "./components/RealtimeView";
 import { NewFeedView } from "./components/NewFeedView";
 
 /** トップで選ぶ作業モード。`edit` は feed 取込/作成後の編集画面。 */
@@ -225,7 +225,7 @@ export function App() {
 
       {view === "rt" && (
         <main className="main">
-          <RealtimeAlertsView />
+          <RealtimeView />
         </main>
       )}
 

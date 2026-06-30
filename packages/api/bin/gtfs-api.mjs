@@ -19,6 +19,11 @@ const here = dirname(fileURLToPath(import.meta.url));
 const { openSpecLockRepository, createApiServer, createRtRelayService } = await import(
   resolve(here, "../dist/index.js")
 );
+const {
+  createRealtimeAlertStore,
+  createRealtimeTripUpdateStore,
+  createRealtimeVehicleStore,
+} = await import("@gtfs-studio/core/realtime");
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(`--${name}`);
@@ -33,10 +38,16 @@ const locksPath = resolve(
 
 const repository = openSpecLockRepository(locksPath);
 const rtRelay = createRtRelayService(); // 既定の global fetch を使用
-const server = createApiServer({ repository, rtRelay });
+const rtAlerts = createRealtimeAlertStore();
+const rtVehicles = createRealtimeVehicleStore();
+const rtTripUpdates = createRealtimeTripUpdateStore();
+const server = createApiServer({ repository, rtRelay, rtAlerts, rtVehicles, rtTripUpdates });
 
 server.listen(port, () => {
   console.error(`gtfs-studio API listening on http://localhost:${port}`);
   console.error(`spec-locks: ${locksPath}`);
+  console.error(`GTFS-RT alerts: GET/POST /rt/alerts, GET /rt/alerts.pb`);
+  console.error(`GTFS-RT vehicles: GET/POST /rt/vehicles, GET /rt/vehicles.pb`);
+  console.error(`GTFS-RT trip updates: GET/POST /rt/trip-updates, GET /rt/trip-updates.pb`);
   console.error(`GTFS-RT relay: /rt/sources, POST /rt/sources/:id/poll, GET /rt/sources/:id/feed.pb`);
 });

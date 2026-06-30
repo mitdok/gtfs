@@ -16,7 +16,7 @@
 | GTFS-JP v4 core | 約83% | import/export、v3→v4移行、v4検証、公開ゲート、検収判定、golden標準validator回帰、CI定義 | 実データ回帰、公開URL検証 |
 | Web編集 | MVP完了 | ZIP取込、新規作成、停留所/路線/便追加、検証、公開ゲート表示 | shape編集、運賃詳細、warning承認、公開ワークフロー |
 | API | MVP完了 | spec lockファイル永続化、HTTP検収、RT Alerts/Vehicles/TripUpdates配信 | DB永続化、認証、revision/publish/public URL |
-| GTFS-RT | Alpha〜Beta手前 | ServiceAlerts、RT中継、VehiclePositions、TripUpdates core/API MVP、trip候補・進捗推定 | 地図表示、RT source運用UI、車両位置連動、鮮度監視 |
+| GTFS-RT | 約84% / Beta手前 | ServiceAlerts、RT中継＋source運用UI、VehiclePositions地図デバッグ、TripUpdates core/API MVP、trip候補・進捗推定、車両位置連動MVP、鮮度SLO表示、stale policy、監査ログMVP、公開URL smoke | ダイヤ改正版切替、実ログ評価 |
 | 運用品質 | 未完 | CLI検収、内部テスト、ロードマップ管理 | CI、公開URL smoke、監査ログ、実運用手順 |
 
 ## 2. 次の優先順位
@@ -41,10 +41,11 @@
 
 | ID | 作業 | 完了条件 | 関連 |
 |----|------|----------|------|
-| P2-1 | RT Alerts WebをAPI保存へ接続 | ローカル保存でなくAPI CRUDを使って `.pb` 配信まで反映 | RT-1 |
-| P2-2 | VehiclePositions地図デバッグ表示 | 最新位置、age、route/trip候補をWebで確認できる | RT-3 |
-| P2-3 | TripUpdatesの実ソース評価 | 実ログから候補なし/一意/曖昧/正解一致率を計測 | RT-4 |
-| P2-4 | RT鮮度SLO監視 | TripUpdates/VehiclePositions 90秒、Alerts 10分の逸脱を検出 | RT-5 |
+| P2-1 | RT Alerts WebをAPI保存へ接続 | ローカル保存でなくAPI CRUDを使って `.pb` 配信まで反映 | ✅ RT-1 |
+| P2-2 | VehiclePositions地図デバッグ表示 | 最新位置、age、route/trip候補をWebで確認できる | ✅ RT-3 |
+| P2-3 | TripUpdatesの実ソース評価 | 実ログから候補なし/一意/曖昧/正解一致率を計測 | ⏳ RT-4 評価API/Web MVP |
+| P2-4 | RT鮮度SLO監視 | TripUpdates/VehiclePositions 90秒、Alerts 10分の逸脱を検出 | ✅ RT-5 |
+| P2-5 | RT source運用UI | 外部GTFS-RT sourceの登録、poll、status、feed.pb確認をWebで実行できる | ✅ RT-2 |
 
 ### P3: 実務編集を強化する
 
@@ -97,7 +98,7 @@
 | S6 | publish URL実装 | version固定URLとlatest URLを配信できる | 利用者向け公開 |
 | S7 | public URL smoke | 公開URLからzip取得、decode/検証/validator結果取込を確認 | 公開後品質確認 |
 | S8 | API認証・監査ログMVP | 公開・RT書き込み・設定変更にtoken認証と最低限の操作ログを付ける | 運用保護 |
-| S9 | RT地図・鮮度監視 | VehiclePositions地図表示、TripUpdates/VehiclePositions/Alertsの鮮度SLOを見られる | RT運用品質 |
+| S9 | RT地図・鮮度監視 | VehiclePositions地図表示、TripUpdates/VehiclePositions/Alertsの鮮度SLOを見られる | ✅ MVP完了 |
 | S10 | RT実ログ評価 | TripUpdates候補抽出の候補なし/一意/曖昧/正解一致率を実ログで評価 | RT精度評価 |
 | S11 | Web実務編集の穴埋め | shape編集、運賃詳細、warning承認、停留所/便の削除・並べ替えを実装 | 実務編集品質 |
 | S12 | 30日運用チェック | 鮮度逸脱、decode error、source error、公開URL smokeの記録が残る | 実務OK判定 |

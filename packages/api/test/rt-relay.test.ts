@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type { AddressInfo } from "node:net";
-import type { Server } from "node:http";
+import { createServer, type Server } from "node:http";
+import { exportToZip, importEntries } from "@gtfs-studio/core";
 import {
   createRealtimeAlertStore,
   createRealtimeTripUpdateStore,
@@ -11,6 +12,8 @@ import {
 import { openSpecLockRepository } from "../src/spec-lock-repository.js";
 import { createRtRelayService, type RtFetch, type RtFetchResponse } from "../src/rt-relay.js";
 import { createApiServer } from "../src/server.js";
+
+const enc = new TextEncoder();
 
 /** 指定タイムスタンプの ServiceAlerts Feed をバイト列で作る。 */
 function alertFeed(feedTs: number): Uint8Array {
@@ -39,6 +42,21 @@ function statusResponse(status: number): RtFetchResponse {
     headers: { get: () => null },
     arrayBuffer: async () => new ArrayBuffer(0),
   };
+}
+
+function staticGtfsZipBase64(): string {
+  const entries: Record<string, Uint8Array> = {};
+  for (const [name, text] of Object.entries({
+    "agency.txt": "agency_id,agency_name,agency_url,agency_timezone\na,Agency,https://example.com,Asia/Tokyo\n",
+    "stops.txt": "stop_id,stop_name,stop_lat,stop_lon\nS1,One,34.7,137.3\nS2,Two,34.8,137.4\n",
+    "routes.txt": "route_id,agency_id,route_short_name,route_long_name,route_type\nR1,a,1,Route,3\n",
+    "trips.txt": "route_id,service_id,trip_id\nR1,weekday,T1\n",
+    "stop_times.txt": "trip_id,arrival_time,departure_time,stop_id,stop_sequence\nT1,07:00:00,07:00:00,S1,1\nT1,07:10:00,07:10:00,S2,2\n",
+    "calendar.txt": "service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date\nweekday,1,1,1,1,1,0,0,20260401,20261231\n",
+  })) {
+    entries[name] = enc.encode(text);
+  }
+  return Buffer.from(exportToZip(importEntries(entries).feed)).toString("base64");
 }
 
 describe("RT-2 poller（fetch注入）", () => {
@@ -149,6 +167,42 @@ describe("RT-2 中継エンドポイント", () => {
     });
     const pb = await fetch(`${base}/rt/sources/src3/feed.pb`);
     expect(pb.status).toBe(503);
+  });
+
+  it("stalePolicy=block の source は stale feed を 503 にする", async () => {
+    if (server) await new Promise<void>((r) => server!.close(() => r()));
+    const repository = openSpecLockRepository("/tmp/__rt_stale_policy_locks_unused.json");
+    const rtRelay = createRtRelayService({
+      fetch: async () => okResponse(alertFeed(1_000), { etag: '"e-stale"' }),
+      now: () => 1_000,
+      initialSources: [],
+    });
+    server = createApiServer({ repository, rtRelay, rtNow: () => 1_700 });
+    base = await new Promise((resolve) => {
+      server!.listen(0, "127.0.0.1", () => {
+        const { port } = server!.address() as AddressInfo;
+        resolve(`http://127.0.0.1:${port}`);
+      });
+    });
+
+    await fetch(`${base}/rt/sources/src-block`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        url: "http://feed/block.pb",
+        feedType: "service_alerts",
+        pollIntervalSec: 30,
+        stalePolicy: "block",
+      }),
+    });
+    await fetch(`${base}/rt/sources/src-block/poll`, { method: "POST" });
+
+    const pb = await fetch(`${base}/rt/sources/src-block/feed.pb`);
+    expect(pb.status).toBe(503);
+    expect(await pb.json()).toMatchObject({
+      stale: true,
+      stalePolicy: "block",
+    });
   });
 
   it("rtRelay未設定なら /rt は 501", async () => {
@@ -370,6 +424,72 @@ describe("RT-3 VehiclePositions API", () => {
     const read = await fetch(`${base}/rt/vehicles/veh-rate`);
     expect(read.status).toBe(200);
   });
+
+  it("VehiclePositionからTripUpdateを生成して保存できる", async () => {
+    await restart({
+      repository: openSpecLockRepository("/tmp/__rt_vehicle_trip_update_locks_unused.json"),
+      rtVehicles: createRealtimeVehicleStore(),
+      rtTripUpdates: createRealtimeTripUpdateStore(),
+      rtNow: () => 1_781_568_000,
+    });
+    await fetch(`${base}/rt/vehicles/veh-tu`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        vehicleId: "bus-tu",
+        latitude: 34.7,
+        longitude: 137.3,
+        routeId: "R1",
+        tripId: "T1",
+      }),
+    });
+
+    const generated = await fetch(`${base}/rt/vehicles/veh-tu/trip-update`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        zipBase64: staticGtfsZipBase64(),
+        atTime: "07:05:00",
+        delaySec: 120,
+        save: true,
+      }),
+    });
+    expect(generated.status).toBe(200);
+    const body = await generated.json();
+    expect(body.update.tripId).toBe("T1");
+    expect(body.update.vehicleId).toBe("bus-tu");
+    expect(body.update.stopTimeUpdates.map((stop: { stopId: string }) => stop.stopId)).toEqual(["S2"]);
+
+    const list = await fetch(`${base}/rt/trip-updates`);
+    expect((await list.json()).tripUpdates.map((update: { id: string }) => update.id)).toEqual([
+      "veh-tu-trip-update",
+    ]);
+  });
+
+  it("静的GTFSとprobeからtrip候補品質を評価できる", async () => {
+    await restart({
+      repository: openSpecLockRepository("/tmp/__rt_trip_match_eval_locks_unused.json"),
+    });
+
+    const evaluated = await fetch(`${base}/rt/trip-matching/evaluate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        zipBase64: staticGtfsZipBase64(),
+        probes: [
+          { routeId: "R1", atTime: "07:01:00", expectedTripId: "T1", maxTimeDiffSec: 120 },
+          { routeId: "NOPE", atTime: "07:10:30", expectedTripId: "T1", maxTimeDiffSec: 120 },
+        ],
+      }),
+    });
+    expect(evaluated.status).toBe(200);
+    const body = await evaluated.json();
+    expect(body.total).toBe(2);
+    expect(body.unique).toBe(1);
+    expect(body.miss).toBe(1);
+    expect(body.expectedAccuracy).toBe(0.5);
+    expect(body.results[0].bestTripId).toBe("T1");
+  });
 });
 
 describe("RT-4 TripUpdates API", () => {
@@ -440,5 +560,166 @@ describe("RT-4 TripUpdates API", () => {
     const del = await fetch(`${base}/rt/trip-updates/tu-2`, { method: "DELETE" });
     expect((await del.json()).removed).toBe(true);
     expect((await fetch(`${base}/rt/trip-updates/tu-2`)).status).toBe(404);
+  });
+});
+
+describe("RT-5 freshness status API", () => {
+  let server: Server;
+  let base: string;
+
+  beforeEach(async () => {
+    const repository = openSpecLockRepository("/tmp/__rt_status_locks_unused.json");
+    const alerts = createRealtimeAlertStore();
+    const vehicles = createRealtimeVehicleStore();
+    const tripUpdates = createRealtimeTripUpdateStore();
+    alerts.upsert(
+      { id: "alert-fresh", informedEntities: [{ routeId: "R1" }], headerText: { ja: "遅延" } },
+      1_000,
+    );
+    vehicles.upsert(
+      { id: "veh-stale", vehicleId: "bus-1", latitude: 34.7, longitude: 137.3 },
+      800,
+    );
+
+    server = createApiServer({
+      repository,
+      rtAlerts: alerts,
+      rtVehicles: vehicles,
+      rtTripUpdates: tripUpdates,
+      rtNow: () => 1_000,
+    });
+    base = await new Promise((resolve) => {
+      server.listen(0, "127.0.0.1", () => {
+        const { port } = server.address() as AddressInfo;
+        resolve(`http://127.0.0.1:${port}`);
+      });
+    });
+  });
+  afterEach(async () => {
+    await new Promise<void>((r) => server.close(() => r()));
+  });
+
+  it("GET /rt/status は各RT feedの鮮度SLOを返す", async () => {
+    const res = await fetch(`${base}/rt/status`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const byType = new Map(body.feeds.map((feed: { feedType: string }) => [feed.feedType, feed]));
+    expect(byType.get("service_alerts")).toMatchObject({
+      status: "fresh",
+      sloSec: 600,
+      entityCount: 1,
+    });
+    expect(byType.get("vehicle_positions")).toMatchObject({
+      status: "stale",
+      ageSec: 200,
+      sloSec: 90,
+      entityCount: 1,
+    });
+    expect(byType.get("trip_updates")).toMatchObject({
+      status: "no_data",
+      sloSec: 90,
+      entityCount: 0,
+    });
+  });
+});
+
+describe("RT-5 audit log API", () => {
+  let server: Server;
+  let base: string;
+
+  beforeEach(async () => {
+    const repository = openSpecLockRepository("/tmp/__rt_audit_locks_unused.json");
+    server = createApiServer({
+      repository,
+      rtAlerts: createRealtimeAlertStore(),
+      rtRelay: createRtRelayService({ fetch: async () => statusResponse(500), now: () => 1_000 }),
+      rtNow: () => 1_000,
+    });
+    base = await new Promise((resolve) => {
+      server.listen(0, "127.0.0.1", () => {
+        const { port } = server.address() as AddressInfo;
+        resolve(`http://127.0.0.1:${port}`);
+      });
+    });
+  });
+  afterEach(async () => {
+    await new Promise<void>((r) => server.close(() => r()));
+  });
+
+  it("RT変更操作とpoll結果を /rt/audit に記録する", async () => {
+    await fetch(`${base}/rt/alerts`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "audit-alert", informedEntities: [{ routeId: "R1" }], headerText: { ja: "遅延" } }),
+    });
+    await fetch(`${base}/rt/sources/audit-source`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: "http://feed/audit.pb", feedType: "service_alerts", pollIntervalSec: 30 }),
+    });
+    await fetch(`${base}/rt/sources/audit-source/poll`, { method: "POST" });
+
+    const res = await fetch(`${base}/rt/audit`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.events.map((event: { action: string }) => event.action)).toEqual([
+      "source.poll",
+      "source.upsert",
+      "alert.upsert",
+    ]);
+    expect(body.events[0]).toMatchObject({ outcome: "failed", targetId: "audit-source" });
+  });
+});
+
+describe("RT-5 public URL smoke API", () => {
+  let feedServer: Server;
+  let apiServer: Server;
+  let feedBase: string;
+  let apiBase: string;
+
+  beforeEach(async () => {
+    feedServer = createServer((_req, res) => {
+      const bytes = alertFeed(1_000);
+      res.writeHead(200, { "content-type": "application/x-protobuf" });
+      res.end(Buffer.from(bytes));
+    });
+    feedBase = await new Promise((resolve) => {
+      feedServer.listen(0, "127.0.0.1", () => {
+        const { port } = feedServer.address() as AddressInfo;
+        resolve(`http://127.0.0.1:${port}`);
+      });
+    });
+
+    const repository = openSpecLockRepository("/tmp/__rt_smoke_locks_unused.json");
+    apiServer = createApiServer({ repository, rtNow: () => 1_030 });
+    apiBase = await new Promise((resolve) => {
+      apiServer.listen(0, "127.0.0.1", () => {
+        const { port } = apiServer.address() as AddressInfo;
+        resolve(`http://127.0.0.1:${port}`);
+      });
+    });
+  });
+  afterEach(async () => {
+    await new Promise<void>((r) => apiServer.close(() => r()));
+    await new Promise<void>((r) => feedServer.close(() => r()));
+  });
+
+  it("POST /rt/smoke は公開URLのprotobufをdecodeして鮮度を返す", async () => {
+    const res = await fetch(`${apiBase}/rt/smoke`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: `${feedBase}/alerts.pb`, feedType: "service_alerts" }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      ok: true,
+      stage: "decode",
+      httpStatus: 200,
+      feedType: "service_alerts",
+      ageSec: 30,
+      stale: false,
+    });
+    expect(body.summary.counts.alert).toBe(1);
   });
 });

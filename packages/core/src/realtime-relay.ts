@@ -12,6 +12,7 @@ import { decodeRealtimeFeed } from "./realtime.js";
 import type { transit_realtime } from "gtfs-realtime-bindings";
 
 export type RtFeedType = "trip_updates" | "vehicle_positions" | "service_alerts" | "mixed";
+export type RtStalePolicy = "serve" | "warn" | "block";
 
 /** RT-5-1 鮮度SLO（秒）: TripUpdates/VehiclePositions=90、Alerts=600。 */
 export const RT_FRESHNESS_SLO_SEC: Record<RtFeedType, number> = {
@@ -30,6 +31,8 @@ export interface RtSource {
   /** 取得時に付与する認証等のヘッダ。 */
   headers?: Record<string, string>;
   enabled?: boolean;
+  /** stale時の再配信方針。既定は warn（配信継続＋stale header）。 */
+  stalePolicy?: RtStalePolicy;
   /** 静的GTFS revision との紐付け（RT-5-5 切替整合用）。 */
   gtfsRevision?: string;
 }
