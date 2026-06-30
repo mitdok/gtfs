@@ -183,6 +183,13 @@ tr.warning td:first-child { color: #b07d10; font-weight: 600; }
 .rt-vehicle-map-pane { position: relative; min-width: 0; min-height: 360px; border: 1px solid #d0d7de; }
 .rt-vehicle-preview { grid-column: 1 / -1; min-width: 0; }
 .rt-vehicle-preview pre { max-height: 220px; }
+.rt-match-eval { margin-top: 12px; display: grid; gap: 10px; }
+.rt-match-eval label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #57606a; }
+.rt-match-eval input, .rt-match-eval textarea {
+  width: 100%; border: 1px solid #d0d7de; border-radius: 6px; padding: 6px 8px;
+  font: inherit; color: #222; background: #fff;
+}
+.rt-match-eval textarea { min-height: 96px; resize: vertical; }
 .rt-sources-view {
   flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(430px, 0.8fr) 1.2fr;
   grid-template-rows: auto minmax(220px, 1fr); gap: 16px; padding: 16px; background: #fff; overflow: auto;

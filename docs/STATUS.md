@@ -128,7 +128,7 @@ GTFS-RTはフェーズ2以降の対象。ロードマップ、課題、達成管
 | RT-1 | ✅ core store＋API pb配信＋Web API接続完了 | ServiceAlerts手動投入＋protobuf配信（`src/realtime.ts`, `api/server.ts`, `RealtimeAlertsView.tsx`） |
 | RT-2 | ✅ core relay＋api poller/配信＋Web source運用UI | 外部GTFS-RT中継・正規化・source管理（`realtime-relay.ts`, `api/rt-relay.ts`, `RealtimeSourcesView.tsx`） |
 | RT-3 | ✅ core store＋API pb配信・認証MVP＋Web地図デバッグ完了 | VehiclePositions protobuf生成・最新位置保存・HTTP配信・地図表示（`src/realtime.ts`, `api/server.ts`, `RealtimeVehiclesView.tsx`） |
-| RT-4 | ⏳ core store＋API pb配信＋静的index・trip候補・進捗推定・車両位置連動・候補評価API/Web MVP完了 / 実データ評価未 | TripUpdates生成・静的GTFS突合・VehiclePositionからTripUpdate保存・trip候補品質評価 |
+| RT-4 | ⏳ core store＋API pb配信＋静的index・trip候補・進捗推定・車両位置連動・候補評価API/Web＋JSON/CSV probe入力MVP完了 / 実データ評価未 | TripUpdates生成・静的GTFS突合・VehiclePositionからTripUpdate保存・trip候補品質評価 |
 | RT-5 | ⏳ 鮮度SLO表示＋stale policy＋監査ログMVP＋公開URL smoke＋静的GTFS参照ID照合API/Web完了 / revision切替運用未 | `/rt/status`、Web Freshness、`/rt/audit`、Web Audit、`/rt/smoke`、Web Smoke、`/rt/static-compat/check`、Web Static CompatでSLO逸脱・操作履歴・公開URL decode・RT参照ID整合を確認 |
 
 > 凡例: ✅ 実装済 / ⏳ 未実装・予定。

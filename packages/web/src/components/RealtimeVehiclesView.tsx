@@ -205,6 +205,14 @@ export function RealtimeVehiclesView() {
     setGtfsZipName(file.name);
   }, []);
 
+  const onProbeFile = useCallback(async (file: File) => {
+    const text = await file.text();
+    const probes = file.name.toLowerCase().endsWith(".csv") ? parseProbeCsv(text) : JSON.parse(text);
+    if (!Array.isArray(probes)) throw new Error("probe file must contain an array");
+    setMatchProbeJson(JSON.stringify(probes, null, 2));
+    setStatus(`probeを読み込みました: ${file.name} / ${probes.length}件`);
+  }, []);
+
   const onGenerateTripUpdate = useCallback(async () => {
     setError(null);
     setStatus(null);
@@ -350,6 +358,18 @@ export function RealtimeVehiclesView() {
               trip候補probe JSON
               <textarea value={matchProbeJson} onChange={(e) => setMatchProbeJson(e.target.value)} rows={4} />
             </label>
+            <label>
+              probe JSON/CSV
+              <input
+                type="file"
+                accept=".json,.csv,application/json,text/csv"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void onProbeFile(file).catch((err) => setError(err instanceof Error ? err.message : String(err)));
+                  e.target.value = "";
+                }}
+              />
+            </label>
             <div className="rt-actions">
               <button onClick={onEvaluateTripMatching}>候補品質を評価</button>
             </div>
@@ -424,6 +444,60 @@ function bytesToBase64(bytes: Uint8Array): string {
     binary += String.fromCharCode(...bytes.slice(i, i + chunkSize));
   }
   return btoa(binary);
+}
+
+function parseProbeCsv(text: string): Array<Record<string, string | number>> {
+  const rows = parseCsvRows(text).filter((row) => row.some((cell) => cell.trim() !== ""));
+  const [header, ...body] = rows;
+  if (!header || header.length === 0) return [];
+  return body.map((row) => {
+    const probe: Record<string, string | number> = {};
+    header.forEach((name, index) => {
+      const key = name.trim();
+      const raw = row[index]?.trim() ?? "";
+      if (!key || raw === "") return;
+      probe[key] = ["directionId", "maxTimeDiffSec"].includes(key) ? Number(raw) : raw;
+    });
+    return probe;
+  });
+}
+
+function parseCsvRows(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (quoted) {
+      if (ch === '"' && next === '"') {
+        cell += '"';
+        i++;
+      } else if (ch === '"') {
+        quoted = false;
+      } else {
+        cell += ch;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      quoted = true;
+    } else if (ch === ",") {
+      row.push(cell);
+      cell = "";
+    } else if (ch === "\n") {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+    } else if (ch !== "\r") {
+      cell += ch;
+    }
+  }
+  row.push(cell);
+  rows.push(row);
+  return rows;
 }
 
 function upsertVehicle(vehicles: StoredVehiclePosition[], vehicle: StoredVehiclePosition): StoredVehiclePosition[] {
