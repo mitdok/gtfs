@@ -21,6 +21,7 @@ import {
 } from "@gtfs-studio/core";
 import {
   RT_FRESHNESS_SLO_SEC,
+  checkRealtimeStaticCompatibility,
   validateRealtimeFeed,
   type RtFeedType,
   type RtSource,
@@ -192,6 +193,11 @@ interface VehicleTripUpdateRequest {
 interface TripMatchingEvaluateRequest {
   zipBase64?: string;
   probes?: RealtimeTripMatchProbe[];
+}
+
+interface RtStaticCompatRequest {
+  zipBase64?: string;
+  feedBase64?: string;
 }
 
 export function createApiServer(options: ApiOptions): Server {
@@ -388,6 +394,19 @@ export function createApiServer(options: ApiOptions): Server {
         const feed = importGtfsZip(new Uint8Array(Buffer.from(body.zipBase64, "base64"))).feed;
         const index = buildRealtimeTripIndex(feed);
         return sendJson(res, 200, evaluateRealtimeTripMatching(index, body.probes));
+      }
+
+      if (path === "/rt/static-compat/check") {
+        if (method !== "POST") return sendJson(res, 405, { error: "method not allowed" });
+        const body = (await readJsonBody(req)) as RtStaticCompatRequest;
+        if (!body.zipBase64) return sendJson(res, 400, { error: "zipBase64 is required" });
+        if (!body.feedBase64) return sendJson(res, 400, { error: "feedBase64 is required" });
+        const staticFeed = importGtfsZip(new Uint8Array(Buffer.from(body.zipBase64, "base64"))).feed;
+        const { summary } = validateRealtimeFeed(new Uint8Array(Buffer.from(body.feedBase64, "base64")));
+        return sendJson(res, 200, {
+          summary,
+          compatibility: checkRealtimeStaticCompatibility(staticFeed, summary),
+        });
       }
 
       const vehicleTripUpdateMatch = path.match(/^\/rt\/vehicles\/([^/]+)\/trip-update$/);

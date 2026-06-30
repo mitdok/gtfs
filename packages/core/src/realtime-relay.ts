@@ -9,6 +9,7 @@
  * （HTTP poll）は api 層が担い、結果を `ingest` / `recordFailure` で渡す。
  */
 import { decodeRealtimeFeed } from "./realtime.js";
+import { getRows, type Feed } from "./model.js";
 import type { transit_realtime } from "gtfs-realtime-bindings";
 
 export type RtFeedType = "trip_updates" | "vehicle_positions" | "service_alerts" | "mixed";
@@ -50,6 +51,24 @@ export interface RtFeedSummary {
   referencedStopIds: string[];
   /** 検証で見つかった問題。 */
   issues: string[];
+}
+
+export type RtStaticReferenceType = "trip" | "route" | "stop";
+
+export interface RtStaticReferenceIssue {
+  type: RtStaticReferenceType;
+  id: string;
+}
+
+export interface RtStaticCompatibilityReport {
+  ok: boolean;
+  checked: { tripIds: number; routeIds: number; stopIds: number };
+  missing: {
+    tripIds: string[];
+    routeIds: string[];
+    stopIds: string[];
+  };
+  issues: RtStaticReferenceIssue[];
 }
 
 export interface RtRelayMetrics {
@@ -152,6 +171,41 @@ export function validateRealtimeFeed(
   return { feed, summary };
 }
 
+/**
+ * RT Feed が参照する trip_id / route_id / stop_id が、指定した静的GTFSに存在するか確認する。
+ * ダイヤ改正版へ切り替える前の最低限の整合確認として使う。
+ */
+export function checkRealtimeStaticCompatibility(
+  feed: Feed,
+  summary: RtFeedSummary,
+): RtStaticCompatibilityReport {
+  const tripIds = idSet(feed, "trips", "trip_id");
+  const routeIds = idSet(feed, "routes", "route_id");
+  const stopIds = idSet(feed, "stops", "stop_id");
+  const missingTripIds = summary.referencedTripIds.filter((id) => !tripIds.has(id));
+  const missingRouteIds = summary.referencedRouteIds.filter((id) => !routeIds.has(id));
+  const missingStopIds = summary.referencedStopIds.filter((id) => !stopIds.has(id));
+  const issues: RtStaticReferenceIssue[] = [
+    ...missingTripIds.map((id) => ({ type: "trip" as const, id })),
+    ...missingRouteIds.map((id) => ({ type: "route" as const, id })),
+    ...missingStopIds.map((id) => ({ type: "stop" as const, id })),
+  ];
+  return {
+    ok: issues.length === 0,
+    checked: {
+      tripIds: summary.referencedTripIds.length,
+      routeIds: summary.referencedRouteIds.length,
+      stopIds: summary.referencedStopIds.length,
+    },
+    missing: {
+      tripIds: missingTripIds,
+      routeIds: missingRouteIds,
+      stopIds: missingStopIds,
+    },
+    issues,
+  };
+}
+
 function isValidLatLon(lat?: number | null, lon?: number | null): boolean {
   return (
     lat != null &&
@@ -162,6 +216,10 @@ function isValidLatLon(lat?: number | null, lon?: number | null): boolean {
     lon <= 180 &&
     !(lat === 0 && lon === 0)
   );
+}
+
+function idSet(feed: Feed, table: string, column: string): Set<string> {
+  return new Set(getRows(feed, table).map((row) => (row[column] ?? "").trim()).filter(Boolean));
 }
 
 interface RelayEntry {

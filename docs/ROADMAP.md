@@ -16,7 +16,7 @@
 | GTFS-JP v4 core | 約83% | import/export、v3→v4移行、v4検証、公開ゲート、検収判定、golden標準validator回帰、CI定義 | 実データ回帰、公開URL検証 |
 | Web編集 | MVP完了 | ZIP取込、新規作成、停留所/路線/便追加、検証、公開ゲート表示 | shape編集、運賃詳細、warning承認、公開ワークフロー |
 | API | MVP完了 | spec lockファイル永続化、HTTP検収、RT Alerts/Vehicles/TripUpdates配信 | DB永続化、認証、revision/publish/public URL |
-| GTFS-RT | 約84% / Beta手前 | ServiceAlerts、RT中継＋source運用UI、VehiclePositions地図デバッグ、TripUpdates core/API MVP、trip候補・進捗推定、車両位置連動MVP、鮮度SLO表示、stale policy、監査ログMVP、公開URL smoke | ダイヤ改正版切替、実ログ評価 |
+| GTFS-RT | 約86% / Beta手前 | ServiceAlerts、RT中継＋source運用UI、VehiclePositions地図デバッグ、TripUpdates core/API MVP、trip候補・進捗推定、車両位置連動MVP、鮮度SLO表示、stale policy、監査ログMVP、公開URL smoke、静的GTFS参照ID照合API | revision切替運用、実ログ評価 |
 | 運用品質 | 未完 | CLI検収、内部テスト、ロードマップ管理 | CI、公開URL smoke、監査ログ、実運用手順 |
 
 ## 2. 次の優先順位

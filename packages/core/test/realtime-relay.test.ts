@@ -1,11 +1,14 @@
 import { describe, it, expect } from "vitest";
 import gtfsRealtimeBindings from "gtfs-realtime-bindings";
 import {
+  checkRealtimeStaticCompatibility,
   createRtRelayStore,
   encodeServiceAlertsFeed,
   validateRealtimeFeed,
   RT_FRESHNESS_SLO_SEC,
 } from "../src/realtime.js";
+import { importEntries } from "../src/importer.js";
+import { sampleEntries } from "./fixtures.js";
 
 const { transit_realtime: rt } = gtfsRealtimeBindings;
 
@@ -58,6 +61,34 @@ describe("RT-2 外部GTFS-RT中継・正規化", () => {
     const { summary } = validateRealtimeFeed(bytes);
     expect(summary.counts.alert).toBe(1);
     expect(summary.referencedStopIds).toEqual(["S1"]);
+  });
+
+  it("RT参照IDと静的GTFSの整合を確認できる", () => {
+    const staticFeed = importEntries(sampleEntries()).feed;
+    const okSummary = validateRealtimeFeed(vehicleFeed(1_000, 34.76, 137.38)).summary;
+    expect(checkRealtimeStaticCompatibility(staticFeed, okSummary).ok).toBe(true);
+
+    const missingSummary = validateRealtimeFeed(
+      rt.FeedMessage.encode(
+        rt.FeedMessage.create({
+          header: { gtfsRealtimeVersion: "2.0", incrementality: 0, timestamp: 1_000 },
+          entity: [
+            {
+              id: "v-missing",
+              vehicle: {
+                vehicle: { id: "BUS-X" },
+                trip: { tripId: "NO_TRIP", routeId: "NO_ROUTE" },
+                position: { latitude: 34.76, longitude: 137.38 },
+              },
+            },
+          ],
+        }),
+      ).finish(),
+    ).summary;
+    const report = checkRealtimeStaticCompatibility(staticFeed, missingSummary);
+    expect(report.ok).toBe(false);
+    expect(report.missing.tripIds).toEqual(["NO_TRIP"]);
+    expect(report.missing.routeIds).toEqual(["NO_ROUTE"]);
   });
 
   it("ingest→serve で最新成功Feedを再配信し、鮮度SLO超過で stale", () => {

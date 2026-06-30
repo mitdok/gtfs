@@ -8,6 +8,7 @@ import {
   createRealtimeVehicleStore,
   decodeRealtimeFeed,
   encodeServiceAlertsFeed,
+  encodeVehiclePositionsFeed,
 } from "@gtfs-studio/core/realtime";
 import { openSpecLockRepository } from "../src/spec-lock-repository.js";
 import { createRtRelayService, type RtFetch, type RtFetchResponse } from "../src/rt-relay.js";
@@ -489,6 +490,41 @@ describe("RT-3 VehiclePositions API", () => {
     expect(body.miss).toBe(1);
     expect(body.expectedAccuracy).toBe(0.5);
     expect(body.results[0].bestTripId).toBe("T1");
+  });
+
+  it("RT feedの参照IDと静的GTFSの整合を確認できる", async () => {
+    await restart({
+      repository: openSpecLockRepository("/tmp/__rt_static_compat_locks_unused.json"),
+    });
+    const feedBase64 = Buffer.from(
+      encodeVehiclePositionsFeed(
+        [
+          {
+            id: "veh-compat",
+            vehicleId: "bus-compat",
+            latitude: 34.7,
+            longitude: 137.3,
+            tripId: "NO_TRIP",
+            routeId: "R1",
+          },
+        ],
+        { timestamp: 1_781_568_000 },
+      ),
+    ).toString("base64");
+
+    const checked = await fetch(`${base}/rt/static-compat/check`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        zipBase64: staticGtfsZipBase64(),
+        feedBase64,
+      }),
+    });
+    expect(checked.status).toBe(200);
+    const body = await checked.json();
+    expect(body.compatibility.ok).toBe(false);
+    expect(body.compatibility.missing.tripIds).toEqual(["NO_TRIP"]);
+    expect(body.compatibility.missing.routeIds).toEqual([]);
   });
 });
 
