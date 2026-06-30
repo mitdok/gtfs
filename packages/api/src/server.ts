@@ -200,6 +200,7 @@ interface TripMatchingEvaluateRequest {
 interface RtStaticCompatRequest {
   zipBase64?: string;
   feedBase64?: string;
+  gtfsRevision?: string;
 }
 
 export function createApiServer(options: ApiOptions): Server {
@@ -556,6 +557,34 @@ export function createApiServer(options: ApiOptions): Server {
           error: result.error,
         });
         return sendJson(res, 200, result);
+      }
+
+      const sourceStaticCompatMatch = path.match(/^\/rt\/sources\/([^/]+)\/static-compat\/check$/);
+      if (sourceStaticCompatMatch) {
+        if (method !== "POST") return sendJson(res, 405, { error: "method not allowed" });
+        const id = decodeURIComponent(sourceStaticCompatMatch[1]!);
+        const source = rt.store.getSource(id);
+        if (!source) return sendJson(res, 404, { error: `unknown rt source: ${id}` });
+        const body = (await readJsonBody(req)) as RtStaticCompatRequest;
+        if (!body.zipBase64) return sendJson(res, 400, { error: "zipBase64 is required" });
+        const served = rt.store.serve(id, rtNow());
+        if (!served.ok || !served.summary) {
+          return sendJson(res, 503, { error: "no cached feed", source, stale: true });
+        }
+        const staticFeed = importGtfsZip(new Uint8Array(Buffer.from(body.zipBase64, "base64"))).feed;
+        const requestedRevision = body.gtfsRevision?.trim() || undefined;
+        const sourceRevision = source.gtfsRevision;
+        return sendJson(res, 200, {
+          source,
+          sourceRevision,
+          requestedRevision,
+          revisionMatched:
+            sourceRevision && requestedRevision ? sourceRevision === requestedRevision : undefined,
+          stale: served.stale,
+          ageSec: served.ageSec,
+          summary: served.summary,
+          compatibility: checkRealtimeStaticCompatibility(staticFeed, served.summary),
+        });
       }
 
       const statusMatch = path.match(/^\/rt\/sources\/([^/]+)\/status$/);

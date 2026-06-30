@@ -43,6 +43,27 @@ interface PollResult {
   error?: string;
 }
 
+interface SourceStaticCompatResult {
+  source: RtSource;
+  sourceRevision?: string;
+  requestedRevision?: string;
+  revisionMatched?: boolean;
+  stale: boolean;
+  ageSec?: number;
+  summary: {
+    entityCount: number;
+    referencedTripIds: string[];
+    referencedRouteIds: string[];
+    referencedStopIds: string[];
+    issues: string[];
+  };
+  compatibility: {
+    ok: boolean;
+    checked: { tripIds: number; routeIds: number; stopIds: number };
+    missing: { tripIds: string[]; routeIds: string[]; stopIds: string[] };
+  };
+}
+
 interface SourceDraft {
   id: string;
   url: string;
@@ -70,6 +91,8 @@ export function RealtimeSourcesView() {
   const [statuses, setStatuses] = useState<Record<string, RtSourceStatus>>({});
   const [lastPoll, setLastPoll] = useState<PollResult | null>(null);
   const [lastPreview, setLastPreview] = useState<Record<string, unknown> | null>(null);
+  const [staticZipBase64, setStaticZipBase64] = useState("");
+  const [staticZipName, setStaticZipName] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -188,6 +211,34 @@ export function RealtimeSourcesView() {
     }
   }, []);
 
+  const onStaticZip = useCallback(async (file: File) => {
+    setStaticZipBase64(bytesToBase64(new Uint8Array(await file.arrayBuffer())));
+    setStaticZipName(file.name);
+  }, []);
+
+  const onCheckStaticCompat = useCallback(async (source: RtSource) => {
+    setError(null);
+    setStatus(null);
+    if (!staticZipBase64) {
+      setError("静的GTFS zipを選択してください");
+      return;
+    }
+    try {
+      const body = await apiJson<SourceStaticCompatResult>(
+        `/rt/sources/${encodeURIComponent(source.id)}/static-compat/check`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ zipBase64: staticZipBase64, gtfsRevision: source.gtfsRevision }),
+        },
+      );
+      setLastPreview(body as unknown as Record<string, unknown>);
+      setStatus(body.compatibility.ok ? "source cached feedは静的GTFSと整合しています" : "source cached feedに欠落参照があります");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }, [staticZipBase64]);
+
   return (
     <div className="rt-sources-view">
       <section className="rt-source-form">
@@ -228,9 +279,21 @@ export function RealtimeSourcesView() {
             GTFS revision
             <input value={draft.gtfsRevision} onChange={(e) => update("gtfsRevision", e.target.value)} />
           </label>
+          <label className="wide">
+            static GTFS zip for source check
+            <input
+              type="file"
+              accept=".zip"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void onStaticZip(file);
+                e.target.value = "";
+              }}
+            />
+          </label>
         </div>
         <div className="rt-actions">
-          <span className="rt-status ok">API: {API_BASE}</span>
+          <span className="rt-status ok">API: {API_BASE}{staticZipName ? ` / ${staticZipName}` : ""}</span>
           <button onClick={() => void refresh()}>再読込</button>
           <button className="primary" onClick={onSave}>sourceを保存</button>
         </div>
@@ -272,6 +335,7 @@ export function RealtimeSourcesView() {
                       <div className="rt-row-actions">
                         <button onClick={() => void onPoll(source.id)}>poll</button>
                         <button onClick={() => void onDownload(source.id)}>feed.pb</button>
+                        <button onClick={() => void onCheckStaticCompat(source)}>compat</button>
                         <button onClick={() => void onRemove(source.id)}>削除</button>
                       </div>
                     </td>
@@ -306,4 +370,13 @@ function nextSourceId(sources: Array<{ id: string }>): string {
   const used = new Set(sources.map((source) => source.id));
   while (used.has(`source-${n}`)) n++;
   return `source-${n}`;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.slice(i, i + chunkSize));
+  }
+  return btoa(binary);
 }

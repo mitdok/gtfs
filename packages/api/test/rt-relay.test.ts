@@ -138,7 +138,12 @@ describe("RT-2 中継エンドポイント", () => {
     const put = await fetch(`${base}/rt/sources/src2`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ url: "http://feed/b.pb", feedType: "service_alerts", pollIntervalSec: 60 }),
+      body: JSON.stringify({
+        url: "http://feed/b.pb",
+        feedType: "service_alerts",
+        pollIntervalSec: 60,
+        gtfsRevision: "rev-20260401",
+      }),
     });
     expect(put.status).toBe(200);
 
@@ -158,6 +163,32 @@ describe("RT-2 中継エンドポイント", () => {
     const body = await st.json();
     expect(body.summary.counts.alert).toBe(1);
     expect(body.stale).toBe(false);
+  });
+
+  it("sourceのcached feedを静的GTFS revisionと照合できる", async () => {
+    await fetch(`${base}/rt/sources/src-compat`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        url: "http://feed/compat.pb",
+        feedType: "service_alerts",
+        pollIntervalSec: 60,
+        gtfsRevision: "rev-20260401",
+      }),
+    });
+    await fetch(`${base}/rt/sources/src-compat/poll`, { method: "POST" });
+
+    const checked = await fetch(`${base}/rt/sources/src-compat/static-compat/check`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ zipBase64: staticGtfsZipBase64(), gtfsRevision: "rev-20260401" }),
+    });
+    expect(checked.status).toBe(200);
+    const body = await checked.json();
+    expect(body.sourceRevision).toBe("rev-20260401");
+    expect(body.revisionMatched).toBe(true);
+    expect(body.compatibility.ok).toBe(true);
+    expect(body.summary.referencedStopIds).toEqual(["S1"]);
   });
 
   it("未pollのsourceの feed.pb は 503", async () => {
