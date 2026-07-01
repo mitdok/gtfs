@@ -49,6 +49,13 @@ pnpm -r test       # 全パッケージテスト
 Web公開物は作業ハブ側の `project-gtfs/public/current/` に集約し、実体の開発とGitea管理はこのリポジトリ `/mnt/hdd20tb/project/gtfs` を正本とする。
 新しい公開ビルド、validator report viewer、運用画面を追加した場合は、このREADME、`/mnt/hdd20tb/project-gtfs/README.md`、`project-dashboard/assets/app.js` を合わせて更新し、dashboardから辿れる状態にする。
 
+## 作業ログ必須運用
+
+- 作業開始時は `/mnt/hdd20tb/tools/project-log -p project-gtfs -c start --status started --prompt "<受けた指示>" "<作業開始内容>"` で、受けた指示プロンプトと対象を必ず記録する。
+- 作業中は判断、知見、違和感、検証結果を `progress`、`verification`、`push` などのcategoryで適時記録する。
+- 作業終了時は `-c end --status complete|partial|blocked` で、実施内容、検証、commit/push、残件、次に見る場所を必ず記録する。
+- ログは `/mnt/hdd20tb/project.log` と `/mnt/hdd20tb/project-events.jsonl` に保存され、次の作業者は最後の `end` ログから再開する。
+
 ### 検収・標準validator
 
 ```bash
