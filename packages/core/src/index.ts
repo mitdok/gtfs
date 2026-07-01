@@ -15,6 +15,7 @@ export * from "./standard-validator.js";
 export * from "./release-gate.js";
 export * from "./acceptance.js";
 export * from "./pipeline.js";
+export * from "./regression-summary.js";
 export * from "./starter-feed.js";
 export * from "./export-profile.js";
 export * from "./exporter.js";

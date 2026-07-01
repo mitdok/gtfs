@@ -13,12 +13,15 @@ import {
   evaluateRealtimeTripMatching,
   importGtfsZip,
   matchedTripDelayToTripUpdate,
+  parseStandardValidatorReport,
   runAcceptancePipeline,
   tripProgressToTripUpdate,
+  validateFeed,
   type SpecLock,
   type SpecLockId,
   type RealtimeTripMatchProbe,
 } from "@gtfs-studio/core";
+import { createHash } from "node:crypto";
 import {
   RT_FRESHNESS_SLO_SEC,
   checkRealtimeStaticCompatibility,
@@ -35,6 +38,7 @@ import type {
   VehiclePositionInput,
 } from "@gtfs-studio/core/realtime";
 import type { SpecLockRepository } from "./spec-lock-repository.js";
+import type { FeedRevision, RevisionRepository, WarningApproval } from "./revision-repository.js";
 import type { RtRelayService } from "./rt-relay.js";
 
 const VALID_LOCK_IDS: SpecLockId[] = [
@@ -43,9 +47,12 @@ const VALID_LOCK_IDS: SpecLockId[] = [
   "GOOGLE_TRANSIT_LOCK",
   "VALIDATOR_LOCK",
 ];
+const VALID_REVISION_STATUSES = new Set(["validated", "published", "superseded"]);
 
 export interface ApiOptions {
   repository: SpecLockRepository;
+  /** GTFS revision 永続化。未指定なら revision/publish 系は 501。 */
+  revisions?: RevisionRepository;
   /** ISO 文字列を返す時刻ソース（テストで固定するため差し替え可能）。 */
   now?: () => string;
   /** GTFS-RT 外部中継サービス（未指定なら /rt 系は 501）。 */
@@ -68,6 +75,11 @@ export interface ApiOptions {
    * 既定は 60 requests / 60s。token認証が無効な場合は適用しない。
    */
   rtVehicleRateLimit?: { windowMs: number; max: number };
+  /**
+   * 静的GTFSのrevision作成・publish・public URL smoke用token。
+   * 未指定または空配列なら互換性のため認証しない。
+   */
+  staticWriteTokens?: string[];
 }
 
 function sendJson(res: ServerResponse, status: number, body: unknown) {
@@ -81,6 +93,11 @@ function sendBytes(res: ServerResponse, status: number, bytes: Uint8Array, heade
   res.end(Buffer.from(bytes));
 }
 
+function sendZip(res: ServerResponse, status: number, bytes: Uint8Array, headers: Record<string, string> = {}) {
+  res.writeHead(status, { ...corsHeaders(), "content-type": "application/zip", ...headers });
+  res.end(Buffer.from(bytes));
+}
+
 function sendNoContent(res: ServerResponse) {
   res.writeHead(204, corsHeaders());
   res.end();
@@ -90,7 +107,7 @@ function corsHeaders(): Record<string, string> {
   return {
     "access-control-allow-origin": "*",
     "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS",
-    "access-control-allow-headers": "content-type,authorization,x-rt-source-token",
+    "access-control-allow-headers": "content-type,authorization,x-api-token,x-rt-source-token",
   };
 }
 
@@ -135,6 +152,39 @@ interface AcceptanceRequest {
   v3Migration?: { standardErrors: number; warningsReasonable?: boolean };
   publicUrl?: { verified: boolean; standardErrors?: number };
   releaseCandidate?: string;
+}
+
+interface CreateRevisionRequest extends AcceptanceRequest {
+  id?: string;
+}
+
+interface PublicUrlSmokeRequest {
+  url?: string;
+  timeoutMs?: number;
+  validationDate?: string;
+  standardReport?: unknown;
+}
+
+interface WarningApprovalsRequest {
+  approvals?: Partial<WarningApproval>[];
+}
+
+type StaticAuditAction =
+  | "revision.create"
+  | "revision.publish"
+  | "revision.public_url_smoke"
+  | "revision.warning_approvals"
+  | "revision.auth_failed";
+
+interface StaticAuditEvent {
+  id: number;
+  at: string;
+  projectId: string;
+  action: StaticAuditAction;
+  targetType: "revision" | "project";
+  targetId: string;
+  outcome: "success" | "failed" | "blocked";
+  detail?: Record<string, unknown>;
 }
 
 interface RtFreshnessStatus {
@@ -206,9 +256,12 @@ interface RtStaticCompatRequest {
 export function createApiServer(options: ApiOptions): Server {
   const { repository } = options;
   const now = options.now ?? (() => new Date().toISOString());
+  const staticWriteTokens = new Set((options.staticWriteTokens ?? []).filter((token) => token.trim() !== ""));
   const rtVehicleTokens = new Set((options.rtVehicleTokens ?? []).filter((token) => token.trim() !== ""));
   const rtVehicleRateLimit = options.rtVehicleRateLimit ?? { windowMs: 60_000, max: 60 };
   const rtVehicleRateBuckets = new Map<string, number[]>();
+  const staticAudit: StaticAuditEvent[] = [];
+  let nextStaticAuditId = 1;
   const rtAudit: RtAuditEvent[] = [];
   let nextAuditId = 1;
 
@@ -290,6 +343,269 @@ export function createApiServer(options: ApiOptions): Server {
         },
         importWarnings: result.importWarnings,
       });
+    }
+
+    const revisionsRootMatch = path.match(/^\/projects\/([^/]+)\/revisions$/);
+    if (revisionsRootMatch) {
+      const revisions = options.revisions;
+      if (!revisions) return sendJson(res, 501, { error: "revision repository is not configured" });
+      const projectId = decodeURIComponent(revisionsRootMatch[1]!);
+      if (method === "GET") {
+        const limitParam = url.searchParams.get("limit");
+        const statusParam = url.searchParams.get("status");
+        if (statusParam !== null && !VALID_REVISION_STATUSES.has(statusParam)) {
+          return sendJson(res, 400, { error: "invalid revision status" });
+        }
+        const all = revisions
+          .list(projectId)
+          .filter((revision) => statusParam === null || revision.status === statusParam);
+        const limit = limitParam === null ? all.length : Math.max(1, Math.min(500, Number(limitParam) || 100));
+        return sendJson(res, 200, { revisions: all.slice(0, limit), total: all.length, limit });
+      }
+      if (method === "POST") {
+        const auth = authorizeStaticWrite(req);
+        if (!auth.ok) {
+          recordStaticAudit(projectId, "revision.auth_failed", "project", projectId, "blocked", {
+            operation: "revision.create",
+          });
+          return sendJson(res, auth.status, { error: auth.error });
+        }
+        const body = (await readJsonBody(req)) as CreateRevisionRequest;
+        if (!body.zipBase64) {
+          recordStaticAudit(projectId, "revision.create", "project", projectId, "failed", {
+            error: "zipBase64 is required",
+          });
+          return sendJson(res, 400, { error: "zipBase64 is required" });
+        }
+        const zip = new Uint8Array(Buffer.from(body.zipBase64, "base64"));
+        const profileId = body.profileId ?? "gtfs-jp-v4";
+        const executedAt = now();
+        const specLocks = repository.snapshot();
+        const result = runAcceptancePipeline({
+          zip,
+          profileId,
+          validationDate: body.validationDate,
+          standardReport: body.standardReport as never,
+          specLocks,
+          realFeedRoundtrip: body.realFeedRoundtrip,
+          v3Migration: body.v3Migration,
+          publicUrl: body.publicUrl,
+          releaseCandidate: body.releaseCandidate,
+          executedAt,
+        });
+        const revision = revisions.create({
+          id: body.id,
+          projectId,
+          createdAt: executedAt,
+          profileId,
+          validationDate: body.validationDate,
+          releaseCandidate: body.releaseCandidate,
+          zip,
+          specLocks,
+          acceptance: result.acceptance,
+          gate: {
+            status: result.gate.status,
+            blockers: result.gate.blockers,
+            requiredSpecLocks: result.gate.requiredSpecLocks,
+          },
+          validation: {
+            gtfsJpV4: result.v4Validation.summary,
+            googleTransitReady: result.googleValidation.summary,
+          },
+          importWarnings: result.importWarnings,
+        });
+        recordStaticAudit(projectId, "revision.create", "revision", revision.id, "success", {
+          status: revision.acceptance.status,
+          gateStatus: revision.gate.status,
+          zipSha256: revision.zipSha256,
+        });
+        return sendJson(res, 201, revision);
+      }
+      return sendJson(res, 405, { error: "method not allowed" });
+    }
+
+    const latestZipMatch = path.match(/^\/projects\/([^/]+)\/latest\/gtfs\.zip$/);
+    if (latestZipMatch && method === "GET") {
+      const revisions = options.revisions;
+      if (!revisions) return sendJson(res, 501, { error: "revision repository is not configured" });
+      const projectId = decodeURIComponent(latestZipMatch[1]!);
+      const revision = revisions.getLatestPublished(projectId);
+      if (!revision) return sendJson(res, 404, { error: "published revision not found" });
+      const zip = revisions.readZip(projectId, revision.id);
+      if (!zip) return sendJson(res, 404, { error: "zip not found" });
+      return sendZip(res, 200, zip, {
+        "cache-control": "no-cache",
+        "x-gtfs-revision": revision.id,
+        "x-gtfs-sha256": revision.zipSha256,
+      });
+    }
+
+    const revisionZipMatch = path.match(/^\/projects\/([^/]+)\/revisions\/([^/]+)\/gtfs\.zip$/);
+    if (revisionZipMatch && method === "GET") {
+      const revisions = options.revisions;
+      if (!revisions) return sendJson(res, 501, { error: "revision repository is not configured" });
+      const projectId = decodeURIComponent(revisionZipMatch[1]!);
+      const revisionId = decodeURIComponent(revisionZipMatch[2]!);
+      const revision = revisions.get(projectId, revisionId);
+      if (!revision) return sendJson(res, 404, { error: "revision not found" });
+      const zip = revisions.readZip(projectId, revisionId);
+      if (!zip) return sendJson(res, 404, { error: "zip not found" });
+      return sendZip(res, 200, zip, {
+        "cache-control": "immutable",
+        "x-gtfs-revision": revision.id,
+        "x-gtfs-sha256": revision.zipSha256,
+      });
+    }
+
+    const publishMatch = path.match(/^\/projects\/([^/]+)\/revisions\/([^/]+):publish$/);
+    if (publishMatch) {
+      const revisions = options.revisions;
+      if (!revisions) return sendJson(res, 501, { error: "revision repository is not configured" });
+      if (method !== "POST") return sendJson(res, 405, { error: "method not allowed" });
+      const projectId = decodeURIComponent(publishMatch[1]!);
+      const revisionId = decodeURIComponent(publishMatch[2]!);
+      const auth = authorizeStaticWrite(req);
+      if (!auth.ok) {
+        recordStaticAudit(projectId, "revision.auth_failed", "revision", revisionId, "blocked", {
+          operation: "revision.publish",
+        });
+        return sendJson(res, auth.status, { error: auth.error });
+      }
+      const revision = revisions.get(projectId, revisionId);
+      if (!revision) {
+        recordStaticAudit(projectId, "revision.publish", "revision", revisionId, "failed", {
+          error: "revision not found",
+        });
+        return sendJson(res, 404, { error: "revision not found" });
+      }
+      if (revision.gate.status !== "ready" || revision.acceptance.status !== "ready") {
+        recordStaticAudit(projectId, "revision.publish", "revision", revisionId, "blocked", {
+          status: revision.acceptance.status,
+          blockers: revision.gate.blockers,
+        });
+        return sendJson(res, 409, {
+          error: "revision is not ready",
+          status: revision.acceptance.status,
+          blockers: revision.gate.blockers,
+        });
+      }
+      const published = revisions.publish(projectId, revisionId, now());
+      recordStaticAudit(projectId, "revision.publish", "revision", revisionId, "success", {
+        publishedAt: published?.publishedAt,
+      });
+      return sendJson(res, 200, published);
+    }
+
+    const publicUrlSmokeMatch = path.match(/^\/projects\/([^/]+)\/revisions\/([^/]+)\/public-url-smoke$/);
+    if (publicUrlSmokeMatch) {
+      const revisions = options.revisions;
+      if (!revisions) return sendJson(res, 501, { error: "revision repository is not configured" });
+      if (method !== "POST") return sendJson(res, 405, { error: "method not allowed" });
+      const projectId = decodeURIComponent(publicUrlSmokeMatch[1]!);
+      const revisionId = decodeURIComponent(publicUrlSmokeMatch[2]!);
+      const auth = authorizeStaticWrite(req);
+      if (!auth.ok) {
+        recordStaticAudit(projectId, "revision.auth_failed", "revision", revisionId, "blocked", {
+          operation: "revision.public_url_smoke",
+        });
+        return sendJson(res, auth.status, { error: auth.error });
+      }
+      const revision = revisions.get(projectId, revisionId);
+      if (!revision) {
+        recordStaticAudit(projectId, "revision.public_url_smoke", "revision", revisionId, "failed", {
+          error: "revision not found",
+        });
+        return sendJson(res, 404, { error: "revision not found" });
+      }
+      const body = (await readJsonBody(req)) as PublicUrlSmokeRequest;
+      if (!body.url) {
+        recordStaticAudit(projectId, "revision.public_url_smoke", "revision", revisionId, "failed", {
+          error: "url is required",
+        });
+        return sendJson(res, 400, { error: "url is required" });
+      }
+      const result = await smokePublicGtfsUrl(body, revision);
+      recordStaticAudit(
+        projectId,
+        "revision.public_url_smoke",
+        "revision",
+        revisionId,
+        result.ok ? "success" : "failed",
+        {
+          url: body.url,
+          stage: result.stage,
+          verified: result.verified,
+          sha256Matched: result.sha256Matched,
+          error: result.error,
+        },
+      );
+      return sendJson(res, 200, result);
+    }
+
+    const warningApprovalsMatch = path.match(/^\/projects\/([^/]+)\/revisions\/([^/]+)\/warning-approvals$/);
+    if (warningApprovalsMatch) {
+      const revisions = options.revisions;
+      if (!revisions) return sendJson(res, 501, { error: "revision repository is not configured" });
+      const projectId = decodeURIComponent(warningApprovalsMatch[1]!);
+      const revisionId = decodeURIComponent(warningApprovalsMatch[2]!);
+      const revision = revisions.get(projectId, revisionId);
+      if (!revision) return sendJson(res, 404, { error: "revision not found" });
+
+      if (method === "GET") {
+        return sendJson(res, 200, {
+          projectId,
+          revisionId,
+          approvals: revision.warningApprovals ?? [],
+        });
+      }
+
+      if (method === "POST" || method === "PUT") {
+        const auth = authorizeStaticWrite(req);
+        if (!auth.ok) {
+          recordStaticAudit(projectId, "revision.auth_failed", "revision", revisionId, "blocked", {
+            operation: "revision.warning_approvals",
+          });
+          return sendJson(res, auth.status, { error: auth.error });
+        }
+        const body = (await readJsonBody(req)) as WarningApprovalsRequest;
+        if (!Array.isArray(body.approvals)) return sendJson(res, 400, { error: "approvals must be an array" });
+        const approvals = body.approvals.map(normalizeWarningApproval);
+        const updated = revisions.saveWarningApprovals(projectId, revisionId, approvals, now());
+        if (!updated) return sendJson(res, 404, { error: "revision not found" });
+        recordStaticAudit(projectId, "revision.warning_approvals", "revision", revisionId, "success", {
+          approvals: approvals.length,
+        });
+        return sendJson(res, 200, {
+          projectId,
+          revisionId,
+          approvals: updated.warningApprovals ?? [],
+        });
+      }
+
+      return sendJson(res, 405, { error: "method not allowed" });
+    }
+
+    const revisionMatch = path.match(/^\/projects\/([^/]+)\/revisions\/([^/]+)$/);
+    if (revisionMatch) {
+      const revisions = options.revisions;
+      if (!revisions) return sendJson(res, 501, { error: "revision repository is not configured" });
+      if (method !== "GET") return sendJson(res, 405, { error: "method not allowed" });
+      const revision = revisions.get(decodeURIComponent(revisionMatch[1]!), decodeURIComponent(revisionMatch[2]!));
+      return revision ? sendJson(res, 200, revision) : sendJson(res, 404, { error: "revision not found" });
+    }
+
+    const staticAuditMatch = path.match(/^\/projects\/([^/]+)\/audit$/);
+    if (staticAuditMatch) {
+      const projectId = decodeURIComponent(staticAuditMatch[1]!);
+      if (method !== "GET") return sendJson(res, 405, { error: "method not allowed" });
+      const auth = authorizeStaticWrite(req);
+      if (!auth.ok) return sendJson(res, auth.status, { error: auth.error });
+      const limit = Number(url.searchParams.get("limit") ?? "100");
+      const events = staticAudit
+        .filter((event) => event.projectId === projectId)
+        .slice(-Math.max(1, Math.min(500, limit)))
+        .reverse();
+      return sendJson(res, 200, { events });
     }
 
     // ---- GTFS-RT 手動ServiceAlerts（RT-1） / 外部中継（RT-2） ----
@@ -699,6 +1015,23 @@ export function createApiServer(options: ApiOptions): Server {
     return { ok: true, token };
   }
 
+  function authorizeStaticWrite(req: IncomingMessage):
+    | { ok: true; token?: string }
+    | { ok: false; status: 401; error: string } {
+    if (staticWriteTokens.size === 0) return { ok: true };
+
+    const token =
+      extractBearer(req.headers.authorization) ??
+      (Array.isArray(req.headers["x-api-token"])
+        ? req.headers["x-api-token"][0]
+        : req.headers["x-api-token"]);
+
+    if (!token || !staticWriteTokens.has(token)) {
+      return { ok: false, status: 401, error: "invalid or missing static write token" };
+    }
+    return { ok: true, token };
+  }
+
   function evaluateRtFreshness(nowSec: number): RtFreshnessStatus[] {
     const feeds: RtFreshnessStatus[] = [
       evaluateStoredFeed(
@@ -764,9 +1097,54 @@ export function createApiServer(options: ApiOptions): Server {
     if (rtAudit.length > 1000) rtAudit.splice(0, rtAudit.length - 1000);
   }
 
+  function recordStaticAudit(
+    projectId: string,
+    action: StaticAuditAction,
+    targetType: StaticAuditEvent["targetType"],
+    targetId: string,
+    outcome: StaticAuditEvent["outcome"],
+    detail?: Record<string, unknown>,
+  ) {
+    staticAudit.push({
+      id: nextStaticAuditId++,
+      at: now(),
+      projectId,
+      action,
+      targetType,
+      targetId,
+      outcome,
+      detail,
+    });
+    if (staticAudit.length > 1000) staticAudit.splice(0, staticAudit.length - 1000);
+  }
+
   function rtNowForAudit(): number {
     return (options.rtNow ?? (() => Math.floor(Date.now() / 1000)))();
   }
+}
+
+function normalizeWarningApproval(input: Partial<WarningApproval>): WarningApproval {
+  const key = requiredString(input.key, "approval.key");
+  const code = requiredString(input.code, "approval.code");
+  const message = requiredString(input.message, "approval.message");
+  const impact = requiredString(input.impact, "approval.impact");
+  const approver = requiredString(input.approver, "approval.approver");
+  const approvedAt = requiredString(input.approvedAt, "approval.approvedAt");
+  if (Number.isNaN(Date.parse(approvedAt))) throw new Error(`invalid approval.approvedAt: ${approvedAt}`);
+  return {
+    key,
+    code,
+    message,
+    entity: input.entity,
+    impact,
+    approver,
+    approvedAt,
+  };
+}
+
+function requiredString(value: unknown, name: string): string {
+  if (typeof value !== "string" || value.trim() === "") throw new Error(`${name} is required`);
+  return value.trim();
 }
 
 async function smokeRealtimeUrl(input: RtSmokeRequest, nowSec: number) {
@@ -817,6 +1195,112 @@ async function smokeRealtimeUrl(input: RtSmokeRequest, nowSec: number) {
     };
   } catch (e) {
     return { ok: false, stage: "decode", url: input.url, httpStatus: response.status, byteLength: bytes.byteLength, error: (e as Error).message };
+  }
+}
+
+async function smokePublicGtfsUrl(input: PublicUrlSmokeRequest, revision: FeedRevision) {
+  const target = new URL(input.url!);
+  if (target.protocol !== "http:" && target.protocol !== "https:") {
+    throw new Error("url must be http or https");
+  }
+  const timeoutMs = Math.max(1_000, Math.min(input.timeoutMs ?? 10_000, 30_000));
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let response: Response;
+  try {
+    response = await fetch(target, { signal: controller.signal });
+  } catch (e) {
+    return {
+      ok: false,
+      stage: "fetch",
+      url: input.url,
+      revisionId: revision.id,
+      error: (e as Error).message,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      stage: "http",
+      url: input.url,
+      revisionId: revision.id,
+      httpStatus: response.status,
+    };
+  }
+
+  let bytes: Uint8Array;
+  try {
+    bytes = new Uint8Array(await response.arrayBuffer());
+  } catch (e) {
+    return {
+      ok: false,
+      stage: "body",
+      url: input.url,
+      revisionId: revision.id,
+      httpStatus: response.status,
+      error: (e as Error).message,
+    };
+  }
+
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  const sha256Matched = sha256 === revision.zipSha256;
+  try {
+    const feed = importGtfsZip(bytes).feed;
+    const gtfsJpV4 = validateFeed(feed, {
+      profileId: "gtfs-jp-v4",
+      validationDate: input.validationDate ?? revision.validationDate,
+    }).summary;
+    const googleTransitReady = validateFeed(feed, {
+      profileId: "google-transit-ready",
+      validationDate: input.validationDate ?? revision.validationDate,
+    }).summary;
+    const standardValidator = input.standardReport
+      ? parseStandardValidatorReport(input.standardReport as never)
+      : undefined;
+    const standardErrors = standardValidator?.summary.errors;
+    const verified =
+      sha256Matched &&
+      gtfsJpV4.errors === 0 &&
+      googleTransitReady.errors === 0 &&
+      (standardErrors ?? 0) === 0;
+    return {
+      ok: verified,
+      verified,
+      stage: "validate",
+      url: input.url,
+      revisionId: revision.id,
+      httpStatus: response.status,
+      byteLength: bytes.byteLength,
+      expectedSha256: revision.zipSha256,
+      sha256,
+      sha256Matched,
+      validation: { gtfsJpV4, googleTransitReady },
+      standardValidator: standardValidator
+        ? {
+            validatorName: standardValidator.validatorName,
+            validatorVersion: standardValidator.validatorVersion,
+            executedAt: standardValidator.executedAt,
+            summary: standardValidator.summary,
+          }
+        : undefined,
+      publicUrl: { verified, standardErrors },
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      stage: "validate",
+      url: input.url,
+      revisionId: revision.id,
+      httpStatus: response.status,
+      byteLength: bytes.byteLength,
+      expectedSha256: revision.zipSha256,
+      sha256,
+      sha256Matched,
+      error: (e as Error).message,
+    };
   }
 }
 

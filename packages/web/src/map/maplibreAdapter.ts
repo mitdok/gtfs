@@ -25,6 +25,8 @@ const COLOR_SELECTED = "#1f6feb";
 export class MapLibreAdapter implements MapAdapter {
   private map: maplibregl.Map | null = null;
   private markers: MarkerInput[] = [];
+  private lines = new Map<string, LngLat[]>();
+  private lineVertexMarkers = new Map<string, maplibregl.Marker[]>();
   private highlightedId: string | null = null;
   private dragMarker: maplibregl.Marker | null = null;
   private hasGlyphs = false;
@@ -62,6 +64,7 @@ export class MapLibreAdapter implements MapAdapter {
   destroy(): void {
     this.dragMarker?.remove();
     this.dragMarker = null;
+    for (const id of this.lineVertexMarkers.keys()) this.removeLineVertexMarkers(id);
     this.map?.remove();
     this.map = null;
   }
@@ -89,11 +92,12 @@ export class MapLibreAdapter implements MapAdapter {
     this.markerClickCb = cb;
   }
 
-  // --- 線形（MVP: 表示のみ） ----------------------------------------------
+  // --- 線形（shape） -------------------------------------------------------
 
-  setLine(id: string, points: LngLat[]): void {
+  setLine(id: string, points: LngLat[], opts?: { editable?: boolean }): void {
     const map = this.map;
     if (!map) return;
+    this.lines.set(id, points);
     const srcId = SRC_LINE_PREFIX + id;
     const lyrId = LYR_LINE_PREFIX + id;
     const data: GeoJSON.Feature = {
@@ -113,12 +117,22 @@ export class MapLibreAdapter implements MapAdapter {
         paint: { "line-color": COLOR_SELECTED, "line-width": 3, "line-opacity": 0.8 },
       });
     }
+    this.syncLineVertexMarkers(id, Boolean(opts?.editable));
+  }
+
+  removeLine(id: string): void {
+    const map = this.map;
+    if (!map) return;
+    this.removeLineVertexMarkers(id);
+    this.lines.delete(id);
+    const srcId = SRC_LINE_PREFIX + id;
+    const lyrId = LYR_LINE_PREFIX + id;
+    if (map.getLayer(lyrId)) map.removeLayer(lyrId);
+    if (map.getSource(srcId)) map.removeSource(srcId);
   }
 
   onLineEdit(cb: (id: string, points: LngLat[]) => void): void {
-    // 頂点編集は S-11（フェーズ1.5）で実装。コールバック登録のみ受ける。
     this.lineEditCb = cb;
-    void this.lineEditCb;
   }
 
   // --- 地図操作 -------------------------------------------------------------
@@ -253,5 +267,39 @@ export class MapLibreAdapter implements MapAdapter {
       this.dragEndCb?.(m.id, { lng: pos.lng, lat: pos.lat });
     });
     this.dragMarker = marker;
+  }
+
+  private syncLineVertexMarkers(id: string, editable: boolean): void {
+    const map = this.map;
+    if (!map) return;
+    this.removeLineVertexMarkers(id);
+    if (!editable) return;
+
+    const points = this.lines.get(id) ?? [];
+    const vertexMarkers = points.map((point, index) => {
+      const marker = new maplibregl.Marker({
+        draggable: true,
+        color: "#f59e0b",
+        scale: 0.72,
+      })
+        .setLngLat([point.lng, point.lat])
+        .addTo(map);
+      marker.on("dragend", () => {
+        const pos = marker.getLngLat();
+        const nextPoints = [...(this.lines.get(id) ?? points)];
+        nextPoints[index] = { lng: pos.lng, lat: pos.lat };
+        this.lines.set(id, nextPoints);
+        this.setLine(id, nextPoints, { editable: true });
+        this.lineEditCb?.(id, nextPoints);
+      });
+      return marker;
+    });
+    this.lineVertexMarkers.set(id, vertexMarkers);
+  }
+
+  private removeLineVertexMarkers(id: string): void {
+    const markers = this.lineVertexMarkers.get(id) ?? [];
+    for (const marker of markers) marker.remove();
+    this.lineVertexMarkers.delete(id);
   }
 }

@@ -12,11 +12,32 @@ import { ValidationView } from "./components/ValidationView";
 import { ReleaseGateView } from "./components/ReleaseGateView";
 import { RealtimeView } from "./components/RealtimeView";
 import { NewFeedView } from "./components/NewFeedView";
+import { FaresView } from "./components/FaresView";
+import { ShapesView } from "./components/ShapesView";
+import { API_BASE, apiJson } from "./lib/api";
 
 /** トップで選ぶ作業モード。`edit` は feed 取込/作成後の編集画面。 */
 type View = "home" | "import" | "new" | "rt" | "edit";
-type EditTab = "stops" | "timetable" | "validation" | "release";
+type EditTab = "stops" | "timetable" | "fares" | "shapes" | "validation" | "release";
 type ProfileId = "gtfs-jp-v4" | "google-transit-ready" | "gtfs-base" | "gtfs-jp-v3-legacy";
+type ApiRevisionStatusFilter = "all" | "validated" | "published" | "superseded";
+
+interface ApiRevisionItem {
+  id: string;
+  status: string;
+  createdAt: string;
+  publishedAt?: string;
+  profileId?: string;
+  acceptance?: { status?: string };
+  gate?: { status?: string };
+  zipSha256?: string;
+}
+
+interface ApiRevisionListResponse {
+  revisions: ApiRevisionItem[];
+  total?: number;
+  limit?: number;
+}
 
 const PROFILE_OPTIONS: { id: ProfileId; label: string }[] = [
   { id: "gtfs-jp-v4", label: "GTFS-JP v4" },
@@ -40,6 +61,14 @@ export function App() {
   const [editTab, setEditTab] = useState<EditTab>("stops");
   const [profileId, setProfileId] = useState<ProfileId>("gtfs-jp-v4");
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
+  const [apiProjectId, setApiProjectId] = useState("demo");
+  const [apiRevisionId, setApiRevisionId] = useState("");
+  const [apiToken, setApiToken] = useState("");
+  const [apiImportStatus, setApiImportStatus] = useState("");
+  const [apiRevisions, setApiRevisions] = useState<ApiRevisionItem[]>([]);
+  const [apiRevisionLimit, setApiRevisionLimit] = useState(20);
+  const [apiRevisionTotal, setApiRevisionTotal] = useState<number | null>(null);
+  const [apiRevisionStatus, setApiRevisionStatus] = useState<ApiRevisionStatusFilter>("all");
 
   const revalidate = useCallback(
     (feed: Feed, nextProfileId = profileId) => {
@@ -77,15 +106,74 @@ export function App() {
     async (file: File) => {
       const bytes = new Uint8Array(await file.arrayBuffer());
       const { feed, warnings } = importGtfsZip(bytes);
+      setApiRevisionId("");
       enterEditor(feed, file.name, warnings);
     },
     [enterEditor],
   );
 
   const onCreateFeed = useCallback(
-    (feed: Feed, name: string) => enterEditor(feed, name, []),
+    (feed: Feed, name: string) => {
+      setApiRevisionId("");
+      enterEditor(feed, name, []);
+    },
     [enterEditor],
   );
+
+  const onApiRevision = useCallback(async () => {
+    const projectId = apiProjectId.trim();
+    const revisionId = apiRevisionId.trim();
+    if (projectId === "") {
+      setApiImportStatus("project ID を入力してください。");
+      return;
+    }
+    const path =
+      revisionId === ""
+        ? `/projects/${encodeURIComponent(projectId)}/latest/gtfs.zip`
+        : `/projects/${encodeURIComponent(projectId)}/revisions/${encodeURIComponent(revisionId)}/gtfs.zip`;
+    try {
+      setApiImportStatus("APIからGTFS zipを読み込み中...");
+      const headers: HeadersInit = {};
+      if (apiToken.trim() !== "") headers.authorization = `Bearer ${apiToken.trim()}`;
+      const response = await fetch(`${API_BASE}${path}`, { headers });
+      if (!response.ok) throw new Error(await response.text());
+      const loadedRevisionId = response.headers.get("x-gtfs-revision") ?? revisionId;
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      const { feed, warnings } = importGtfsZip(bytes);
+      if (loadedRevisionId !== "") setApiRevisionId(loadedRevisionId);
+      enterEditor(
+        feed,
+        loadedRevisionId === "" ? `${projectId}:latest` : `${projectId}:${loadedRevisionId}`,
+        warnings,
+      );
+      setApiImportStatus("");
+    } catch (e) {
+      setApiImportStatus(`API読込エラー: ${(e as Error).message}`);
+    }
+  }, [apiProjectId, apiRevisionId, apiToken, enterEditor]);
+
+  const onApiRevisionList = useCallback(async () => {
+    const projectId = apiProjectId.trim();
+    if (projectId === "") {
+      setApiImportStatus("project ID を入力してください。");
+      return;
+    }
+    try {
+      setApiImportStatus("revision一覧を読み込み中...");
+      const limit = Math.max(1, Math.min(500, Math.floor(apiRevisionLimit) || 20));
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (apiRevisionStatus !== "all") params.set("status", apiRevisionStatus);
+      const body = await apiJson<ApiRevisionListResponse>(
+        `/projects/${encodeURIComponent(projectId)}/revisions?${params.toString()}`,
+        apiToken.trim() === "" ? undefined : { headers: { authorization: `Bearer ${apiToken.trim()}` } },
+      );
+      setApiRevisions(body.revisions);
+      setApiRevisionTotal(body.total ?? body.revisions.length);
+      setApiImportStatus(`revision一覧: ${body.revisions.length}/${body.total ?? body.revisions.length}件`);
+    } catch (e) {
+      setApiImportStatus(`revision一覧エラー: ${(e as Error).message}`);
+    }
+  }, [apiProjectId, apiRevisionLimit, apiRevisionStatus, apiToken]);
 
   const onDownload = useCallback(() => {
     const feed = feedRef.current;
@@ -213,6 +301,87 @@ export function App() {
                 </button>
               )}
             </section>
+            <section className="source-panel api-import-panel">
+              <h2>API revision 読込</h2>
+              <p>保存済み revision または latest の GTFS zip を読み込み、編集を再開します。</p>
+              <div className="api-import-grid">
+                <label>
+                  project
+                  <input value={apiProjectId} onChange={(e) => setApiProjectId(e.target.value)} />
+                </label>
+                <label>
+                  revision
+                  <input value={apiRevisionId} onChange={(e) => setApiRevisionId(e.target.value)} placeholder="空なら latest" />
+                </label>
+                <label>
+                  token
+                  <input value={apiToken} onChange={(e) => setApiToken(e.target.value)} type="password" placeholder="任意" />
+                </label>
+                <label>
+                  limit
+                  <input
+                    value={apiRevisionLimit}
+                    onChange={(e) => setApiRevisionLimit(Number(e.target.value))}
+                    type="number"
+                    min={1}
+                    max={500}
+                  />
+                </label>
+                <label>
+                  status
+                  <select
+                    value={apiRevisionStatus}
+                    onChange={(e) => setApiRevisionStatus(e.target.value as ApiRevisionStatusFilter)}
+                  >
+                    <option value="all">all</option>
+                    <option value="published">published</option>
+                    <option value="validated">validated</option>
+                    <option value="superseded">superseded</option>
+                  </select>
+                </label>
+                <button type="button" onClick={onApiRevision}>
+                  APIから読込
+                </button>
+                <button type="button" onClick={onApiRevisionList}>
+                  一覧
+                </button>
+              </div>
+              {apiRevisions.length > 0 && (
+                <div className="api-revision-list">
+                  <div className="api-revision-list-head">
+                    <span>revision</span>
+                    <span>状態</span>
+                    <span>gate</span>
+                    <span>acceptance</span>
+                    <span>profile</span>
+                    <span>日時</span>
+                    <span>hash</span>
+                  </div>
+                  {apiRevisions.map((revision) => (
+                    <button
+                      key={revision.id}
+                      type="button"
+                      className={apiRevisionId === revision.id ? "selected" : ""}
+                      onClick={() => setApiRevisionId(revision.id)}
+                      title={revision.zipSha256}
+                    >
+                      <span className="mono">{revision.id}</span>
+                      <span className={`revision-status revision-status-${revision.status}`}>{revision.status}</span>
+                      <span>{revision.gate?.status ?? "-"}</span>
+                      <span>{revision.acceptance?.status ?? "-"}</span>
+                      <span>{revision.profileId ?? ""}</span>
+                      <span>{formatRevisionDate(revision.publishedAt ?? revision.createdAt)}</span>
+                      <span className="mono">{revision.zipSha256 ? revision.zipSha256.slice(0, 10) : "-"}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="api-import-meta">
+                API: {API_BASE}
+                {apiRevisionTotal !== null && <span>total: {apiRevisionTotal}</span>}
+                {apiImportStatus && <span>{apiImportStatus}</span>}
+              </div>
+            </section>
           </div>
         </main>
       )}
@@ -238,6 +407,12 @@ export function App() {
             <button className={editTab === "timetable" ? "active" : ""} onClick={() => setEditTab("timetable")}>
               ダイヤ
             </button>
+            <button className={editTab === "fares" ? "active" : ""} onClick={() => setEditTab("fares")}>
+              運賃
+            </button>
+            <button className={editTab === "shapes" ? "active" : ""} onClick={() => setEditTab("shapes")}>
+              shape
+            </button>
             <button className={editTab === "validation" ? "active" : ""} onClick={() => setEditTab("validation")}>
               検証 {summary ? `(${summary.errors + summary.warnings})` : ""}
             </button>
@@ -250,11 +425,39 @@ export function App() {
             {editTab === "timetable" && (
               <TimetableView feed={feed} version={version} mutateFeed={mutateFeed} />
             )}
+            {editTab === "fares" && <FaresView feed={feed} version={version} mutateFeed={mutateFeed} />}
+            {editTab === "shapes" && <ShapesView feed={feed} version={version} mutateFeed={mutateFeed} />}
             {editTab === "validation" && <ValidationView report={report} profileId={profileId} />}
-            {editTab === "release" && <ReleaseGateView feed={feed} profileId={profileId} />}
+            {editTab === "release" && (
+              <ReleaseGateView
+                feed={feed}
+                version={version}
+                profileId={profileId}
+                initialProjectId={apiProjectId}
+                initialRevisionId={apiRevisionId}
+                initialApiToken={apiToken}
+                onRevisionContextChange={(projectId, revisionId) => {
+                  setApiProjectId(projectId);
+                  setApiRevisionId(revisionId);
+                }}
+              />
+            )}
           </main>
         </>
       )}
     </div>
   );
+}
+
+function formatRevisionDate(value?: string): string {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }

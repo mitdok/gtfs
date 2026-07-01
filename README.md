@@ -5,7 +5,7 @@ GTFS-JP（v4）/ GTFS-RT 形式の公開用オープンデータを、取込・�
 
 - **OSS＋コミュニティサポート**を中核とし、SaaS提供と自治体オンプレ運用の双方を可能にする。
 - 仕様書は [`docs/spec/`](./docs/spec/README.md) を参照。
-- 全体ロードマップは [`docs/ROADMAP.md`](./docs/ROADMAP.md)、実装の進捗は [`docs/STATUS.md`](./docs/STATUS.md)、変更履歴は [`CHANGELOG.md`](./CHANGELOG.md) を参照。
+- 全体ロードマップは [`docs/ROADMAP.md`](./docs/ROADMAP.md)、実装の進捗は [`docs/STATUS.md`](./docs/STATUS.md)、直近の整理は [`docs/PROGRESS_20260701.md`](./docs/PROGRESS_20260701.md)、変更履歴は [`CHANGELOG.md`](./CHANGELOG.md) を参照。
 
 > 本プロジェクトは、西沢明氏が無償公開した「西沢ツール」が日本のバスオープンデータ普及に果たした功績を出発点とし、その志をOSSとコミュニティで引き継ぐことを目的とする。
 
@@ -16,6 +16,7 @@ docs/
   spec/           仕様書一式（01〜11章）
   ROADMAP.md      全体ロードマップ・優先順位・確認事項
   STATUS.md       仕様 ⇄ 実装の対応表（実装進捗）
+  PROGRESS_20260701.md  直近の進捗整理・知見
 CHANGELOG.md      変更履歴
 packages/
   core/           GTFS エンジン（取込・検証・移行・出力・検収。フレームワーク非依存・純TS）
@@ -37,6 +38,8 @@ pnpm -r test       # 全パッケージテスト
 ```bash
 pnpm gtfs:validator:install
 pnpm gtfs:validate path/to/gtfs.zip
+pnpm gtfs:anonymize path/to/input.zip gtfs-tmp/regression/anonymized/input.zip
+pnpm gtfs:regression
 ```
 
 - `pnpm gtfs:validator:install` で MobilityData validator `8.0.1` を `tools/gtfs-validator.jar` に配置する。
@@ -45,6 +48,12 @@ pnpm gtfs:validate path/to/gtfs.zip
 - `tools/gtfs-validator.jar` はGit管理外。
 - `pnpm gtfs:golden` で v4 golden sample zip を `gtfs-tmp/golden/` に生成できる。
 - `pnpm gtfs:validate-golden` で golden zip を生成し、標準validator reportを `gtfs-tmp/golden-reports/` に保存できる。
+- `pnpm gtfs:regression` で `gtfs-tmp/regression/manifest.json` に列挙した実フィード/匿名化フィードを取込→再出力→検証し、A-07/A-08 用の証跡を `gtfs-tmp/regression/results/summary.json` に保存できる。
+- `pnpm gtfs:anonymize <input.zip> <output.zip>` で回帰用の匿名化候補zipを生成できる。既定では参照整合を壊さないためIDと座標は保持し、名称・URL・電話・メール等を置換する。
+- `pnpm gtfs:validate <release.zip> --regression-summary gtfs-tmp/regression/results/summary.json --require-reviewed` で回帰結果を A-07/A-08 の検収証跡として取り込める。
+- 実データ回帰の運用方針は [`docs/REGRESSION.md`](./docs/REGRESSION.md)、manifest雛形は [`docs/regression-manifest.example.json`](./docs/regression-manifest.example.json) を参照。
+- 公開前のCLI/Web共通チェックは [`docs/RELEASE_CHECKLIST.md`](./docs/RELEASE_CHECKLIST.md) を参照。
+- API起動・token・revision/publish/smoke運用は [`docs/API_OPERATIONS.md`](./docs/API_OPERATIONS.md) を参照。
 - validatorの詳細ログを見たい場合は `node scripts/gtfs-validate-golden.mjs --verbose` を使う。
 - CIや新規環境では `pnpm gtfs:validator:install && pnpm gtfs:validate-golden` を実行する。
 
@@ -67,6 +76,19 @@ pnpm --filter @gtfs-studio/web dev      # http://localhost:5173
 - GTFS zip を開く → 停留所（一覧＋地図。ピンのドラッグで座標編集）/ ダイヤ表（セル編集）/ 検証 → gtfs.zip 再出力。
 - 地図は自前 MapLibre 基盤を**地図アダプタ**経由で利用（仕様書 04章4.4 / 09章）。
   自前基盤の style URL は環境変数 `VITE_MAP_STYLE_URL` で注入。未設定時は暫定で地理院タイル（淡色）を表示。
+
+#### Web公開ワークフローMVP
+
+公開ゲート画面では、ブラウザ内検証に加えて API/CLI 由来の証跡を取り込める。
+
+1. ZIPインポート、または「API revision 読込」で既存 revision/latest を開く。
+2. 停留所、ダイヤ、運賃、shape を編集する。
+3. 公開ゲートで `report.json`（MobilityData validator）を読み込む。
+4. 必要に応じて `/spec-locks`、回帰 `summary.json`、warning承認を取り込む。
+5. `revision保存` で zip・検証結果・仕様ロック・承認記録を版として保存する。
+6. ready な revision は `publish` し、補完された latest URL に対して `smoke` を実行する。
+
+API接続先は `VITE_GTFS_API_BASE_URL`（既定 `http://localhost:8787`）。書込tokenを使う環境では公開ゲートの token 欄に設定する。
 
 ## ライセンス
 

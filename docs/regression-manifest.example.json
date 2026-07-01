@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "notes": "Copy this file to gtfs-tmp/regression/manifest.json and replace input paths with local, licensed or anonymized GTFS zip files. Do not commit real feeds unless their license and anonymization policy are confirmed.",
+  "cases": [
+    {
+      "id": "real-feed-roundtrip-1",
+      "mode": "roundtrip",
+      "input": "../../path/to/licensed-or-anonymized-gtfs.zip",
+      "profileId": "gtfs-jp-v4",
+      "validationDate": "20260601",
+      "sourceLicense": "unknown",
+      "anonymized": false,
+      "review": {
+        "sourceLicense": "unknown",
+        "allowedForRegression": false,
+        "rawFeedReviewed": false,
+        "anonymizationReviewed": false,
+        "reviewedBy": "",
+        "reviewedAt": "",
+        "notes": "Set allowedForRegression=true only after source license and storage policy are reviewed."
+      }
+    },
+    {
+      "id": "v3-migration-1",
+      "mode": "v3-migration",
+      "input": "../../path/to/licensed-or-anonymized-v3-gtfs.zip",
+      "profileId": "gtfs-jp-v4",
+      "validationDate": "20260601",
+      "referenceDate": "20260601",
+      "sourceLicense": "unknown",
+      "anonymized": false,
+      "review": {
+        "sourceLicense": "unknown",
+        "allowedForRegression": false,
+        "rawFeedReviewed": false,
+        "anonymizationReviewed": false,
+        "reviewedBy": "",
+        "reviewedAt": "",
+        "notes": "For anonymized feeds, set anonymized=true and anonymizationReviewed=true after reviewing the output zip."
+      }
+    }
+  ]
+}

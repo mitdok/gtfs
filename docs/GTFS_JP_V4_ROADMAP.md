@@ -1,6 +1,6 @@
 # GTFS-JP v4対応ロードマップ・達成管理
 
-最終更新: 2026-06-30
+最終更新: 2026-07-01
 
 本書はGTFS StudioのGTFS-JP v4対応を、実装・検証・公開運用の観点で段階管理する。対象は固定路線バスの静的GTFS-JP v4 MVPであり、GTFS-RT、GTFS-Flex、Fares v2は別フェーズとして扱う。
 
@@ -8,7 +8,7 @@
 
 ## 1. 現在地
 
-総合進捗: **83%**
+総合進捗: **88%**
 
 内訳:
 
@@ -21,15 +21,15 @@
 | v4検証ルール | 18 | 16 | ✅ 中核 / 均一運賃以外の詳細・実データ精査不足 | `validator.ts` |
 | Google公開ゲート・公開可否判定 | 10 | 8 | ✅ 判定器＋Web表示 / 運用証跡不足 | `release-gate.ts`, `ReleaseGateView.tsx` |
 | 標準validator連携 | 10 | 8 | ✅ report取込＋CLI Java起動＋CI定義 / runner実績待ち | `standard-validator.ts`, `gtfs-acceptance.mjs`, `.gitea/workflows/ci.yml` |
-| golden sample・実データ検収 | 10 | 7 | ⏳ golden標準validator error 0完了 / 実データ不足 | `acceptance.ts`, `v4-golden-samples.ts`, `gtfs-validate-golden.mjs` |
+| golden sample・実データ検収 | 10 | 9 | ⏳ golden標準validator error 0完了 / 実データ回帰CLI・manifest・匿名化CLI・検収CLI連携追加 / 実データ未固定 | `acceptance.ts`, `v4-golden-samples.ts`, `gtfs-validate-golden.mjs`, `gtfs-regression.mjs`, `gtfs-anonymize.mjs` |
 | Web編集・出力ワークフロー | 7 | 7 | ✅ 新規作成＋路線/停留所/便追加MVP / 公開ワークフロー未完 | `packages/web` |
-| API・永続化・公開URL運用 | 5 | 3 | ✅ API＋ファイル永続化MVP / revision・publish未完 | `packages/api` |
-| **合計** | **100** | **83** |  |  |
+| API・永続化・公開URL運用 | 5 | 5 | ✅ API＋ファイル永続化＋revision/publish＋public URL smoke＋token認証/監査ログMVP | `packages/api` |
+| **合計** | **100** | **88** |  |  |
 
 読み替え:
 
 - **coreライブラリとしてのv4対応**: 約83%。取込、移行、検証、出力、公開判定、golden標準validator回帰とCI定義の主要部は動く。
-- **実務公開できるプロダクトとしてのv4対応**: 約70〜75%。CI連携、実データ検収、revision/publish、公開URL検証が残る。
+- **実務公開できるプロダクトとしてのv4対応**: 約81〜82%。CI runner実績、実データ候補の最終選定/許諾レビュー、DB永続化が残る。
 
 ## 2. フェーズ
 
@@ -39,9 +39,9 @@
 | V4-1 | core入出力MVP | import/migrate/validate/export/filter | ✅ 完了 |
 | V4-2 | 実務検証強化 | v4条件付きルール、Google公開ゲート | ✅ MVP完了 |
 | V4-3 | 標準validator実行 | MobilityData validatorの実行・結果保存 | ✅ CLI MVP完了 |
-| V4-4 | golden sample・実データ回帰 | 最小/夜行/calendar_dates/shape/v3/実データ回帰 | ⏳ golden標準validator完了 / v3・実データ未完 |
+| V4-4 | golden sample・実データ回帰 | 最小/夜行/calendar_dates/shape/v3/実データ回帰 | ⏳ golden標準validator完了 / 回帰CLI・manifest・匿名化CLI・検収CLI連携追加 / 実データ未固定 |
 | V4-5 | Web公開ワークフロー | 公開ゲート、validator結果取込、検収結果表示 | ⏳ 一部完了 |
-| V4-6 | API・永続化・公開URL | spec lock保存、revision、publish、public URL smoke | ⏳ API MVP完了 |
+| V4-6 | API・永続化・公開URL | spec lock保存、revision、publish、public URL smoke、token認証、監査ログ | ✅ API MVP完了 |
 | V4-7 | 実務OK | 11章A-01〜A-10をCI/運用でpass | ⏳ 未達 |
 
 ## 3. 詳細タスク
@@ -98,8 +98,8 @@
 | V4-4-3 | calendar-dates-only | calendarなしでもservice参照が成立 | ✅ validator 8.0.1 error 0 |
 | V4-4-4 | translations-kana | 読み仮名出力を確認 | ✅ validator 8.0.1 error 0 |
 | V4-4-5 | shape-basic | shapes/trips.shape_idを確認 | ✅ validator 8.0.1 error 0 |
-| V4-4-6 | legacy-v3-import | v3由来フィードをv4出力へ移行 | ⏳ |
-| V4-4-7 | real-feed-roundtrip-1 | 実フィード取込→再出力→標準validator error 0 | ⏳ |
+| V4-4-6 | legacy-v3-import | v3由来フィードをv4出力へ移行 | ⏳ manifest・匿名化対応済 / データ未固定 |
+| V4-4-7 | real-feed-roundtrip-1 | 実フィード取込→再出力→標準validator error 0 | ⏳ manifest・匿名化対応済 / データ未固定 |
 
 ### V4-5 Web公開ワークフロー
 
@@ -111,26 +111,27 @@
 | V4-5-4 | 新規GTFS-JP v4作成画面 | agency/route/stops/serviceから最小v4フィードを作成 | ✅ |
 | V4-5-5 | 新規作成後の編集操作 | 路線追加、停留所追加、停留所名/座標編集、便追加ができる | ✅ MVP |
 | V4-5-6 | 検収レポート表示 | A-01〜A-10のpass/failを表示 | ✅ MVP |
-| V4-5-7 | warning承認記録 | warning公開時の承認者・理由・時刻を保存 | ⏳ |
+| V4-5-7 | warning承認記録 | warning公開時の承認者・理由・時刻を保存 | ✅ UI＋JSON控え＋revision API保存MVP |
 
 ### V4-6 API・永続化・公開URL
 
 | ID | タスク | 受入基準 | 状態 |
 |----|--------|----------|------|
-| V4-6-1 | API層作成 | project/revision/validation/exportのAPIがある | ✅ 検収HTTP MVP |
+| V4-6-1 | API層作成 | project/revision/validation/exportのAPIがある | ✅ 検収HTTP＋revision MVP |
 | V4-6-2 | spec lock永続化 | DB/ファイルにlockを保存しAPIで取得 | ✅ ファイル永続化 |
-| V4-6-3 | revision保存 | 生成zip、validation結果、lock snapshotを版に保存 | ⏳ |
-| V4-6-4 | publish | latest URLとversion固定URLを配信 | ⏳ |
-| V4-6-5 | public URL smoke | 公開URLからzip取得・再検証 | ⏳ |
+| V4-6-3 | revision保存 | 生成zip、validation結果、lock snapshotを版に保存 | ✅ ファイル永続化MVP |
+| V4-6-4 | publish | latest URLとversion固定URLを配信 | ✅ API配信MVP |
+| V4-6-5 | public URL smoke | 公開URLからzip取得・再検証 | ✅ API MVP |
+| V4-6-6 | token認証・監査ログ | revision作成/publish/smokeをtoken保護し操作履歴を確認できる | ✅ API MVP |
 
 ## 4. 次の優先順
 
 1. **V4-4 実データ回帰**
    - 利用許諾のある実フィード、または匿名化フィードを固定する。
 2. **Web編集の実務操作強化**
-   - shape編集、運賃詳細、停留所削除/並べ替え、路線属性詳細を追加する。
-3. **V4-6 revision/publish/public URL**
-   - 生成zip、validation結果、lock snapshotを版として保存し、公開URL smokeまでつなぐ。
+   - 公開ワークフローの実運用導線を追加する。
+3. **実データ回帰セット固定**
+   - 利用許諾のある実フィード、または匿名化フィードを固定する。
 
 ## 5. 進捗率の更新ルール
 

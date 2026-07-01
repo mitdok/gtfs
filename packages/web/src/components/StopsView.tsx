@@ -19,6 +19,7 @@ interface Props {
 const DEFAULT_LNG_LAT = { lat: 34.7691, lon: 137.3916 };
 const STOP_COLUMNS = ["stop_id", "stop_name", "stop_lat", "stop_lon", "location_type"];
 const TRANSLATION_COLUMNS = ["table_name", "field_name", "language", "translation", "record_id"];
+const TRANSFER_STOP_FIELDS = ["from_stop_id", "to_stop_id"];
 
 function ensureTable(feed: Feed, name: string, columns: string[]): FeedTable {
   const existing = getTable(feed, name);
@@ -202,6 +203,57 @@ export function StopsView({ feed, version, mutateFeed }: Props) {
     setQuery("");
   };
 
+  const deleteStop = (stopId: string) => {
+    mutateFeed((f) => {
+      const stopsTable = getTable(f, "stops");
+      if (stopsTable) {
+        stopsTable.rows = stopsTable.rows.filter((row) => (row["stop_id"] ?? "") !== stopId);
+      }
+
+      const stopTimesTable = getTable(f, "stop_times");
+      if (stopTimesTable) {
+        stopTimesTable.rows = stopTimesTable.rows.filter((row) => (row["stop_id"] ?? "") !== stopId);
+      }
+
+      const translationsTable = getTable(f, "translations");
+      if (translationsTable) {
+        translationsTable.rows = translationsTable.rows.filter(
+          (row) =>
+            !(
+              (row["table_name"] ?? "") === "stops" &&
+              (row["field_name"] ?? "") === "stop_name" &&
+              (row["record_id"] ?? "") === stopId
+            ),
+        );
+      }
+
+      const transfersTable = getTable(f, "transfers");
+      if (transfersTable) {
+        transfersTable.rows = transfersTable.rows.filter((row) =>
+          TRANSFER_STOP_FIELDS.every((field) => (row[field] ?? "") !== stopId),
+        );
+      }
+
+      for (const row of getRows(f, "stops")) {
+        if ((row["parent_station"] ?? "") === stopId) row["parent_station"] = "";
+      }
+    });
+    if (selectedId === stopId) setSelectedId(null);
+  };
+
+  const moveStop = (stopId: string, direction: -1 | 1) => {
+    mutateFeed((f) => {
+      const stopsTable = getTable(f, "stops");
+      if (!stopsTable) return;
+      const index = stopsTable.rows.findIndex((row) => (row["stop_id"] ?? "") === stopId);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= stopsTable.rows.length) return;
+      const [row] = stopsTable.rows.splice(index, 1);
+      if (!row) return;
+      stopsTable.rows.splice(nextIndex, 0, row);
+    });
+  };
+
   const hasKana = Boolean(getTable(feed, "stops")?.columns.includes("stop_name_kana"));
 
   return (
@@ -227,6 +279,7 @@ export function StopsView({ feed, version, mutateFeed }: Props) {
                 {hasKana && <th>かな</th>}
                 <th>緯度</th>
                 <th>経度</th>
+                <th>操作</th>
               </tr>
             </thead>
             <tbody>
@@ -272,6 +325,41 @@ export function StopsView({ feed, version, mutateFeed }: Props) {
                         onChange={(e) => editStopField(id, "stop_lon", e.target.value)}
                         onClick={(e) => e.stopPropagation()}
                       />
+                    </td>
+                    <td>
+                      <div className="row-actions">
+                        <button
+                          type="button"
+                          title="上へ移動"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            moveStop(id, -1);
+                          }}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          title="下へ移動"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            moveStop(id, 1);
+                          }}
+                        >
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          className="danger"
+                          title="停留所を削除"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteStop(id);
+                          }}
+                        >
+                          削除
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

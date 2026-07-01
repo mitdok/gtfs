@@ -1,6 +1,6 @@
 # GTFS Studio 全体ロードマップ
 
-最終更新: 2026-06-30
+最終更新: 2026-07-01
 
 本書は GTFS Studio の全体進捗、優先順位、未確定事項をまとめる上位ロードマップである。
 詳細な達成管理は以下に分ける。
@@ -13,9 +13,9 @@
 
 | 領域 | 現在地 | 主な実装済み | 残り |
 |------|--------|--------------|------|
-| GTFS-JP v4 core | 約83% | import/export、v3→v4移行、v4検証、公開ゲート、検収判定、golden標準validator回帰、CI定義 | 実データ回帰、公開URL検証 |
-| Web編集 | MVP完了 | ZIP取込、新規作成、停留所/路線/便追加、検証、公開ゲート表示 | shape編集、運賃詳細、warning承認、公開ワークフロー |
-| API | MVP完了 | spec lockファイル永続化、HTTP検収、RT Alerts/Vehicles/TripUpdates配信 | DB永続化、認証、revision/publish/public URL |
+| GTFS-JP v4 core | 約88% | import/export、v3→v4移行、v4検証、公開ゲート、検収判定、golden標準validator回帰、CI定義、実データ回帰CLI/manifest/匿名化CLI、revision/publish/public URL smoke/token認証/監査ログ API MVP | 実データ候補の最終選定/許諾レビュー、DB永続化 |
+| Web編集 | MVP完了 | ZIP取込、新規作成、API revision/latest再読込、停留所/路線/便追加、停留所削除/並べ替え、路線属性詳細、shape編集（表操作＋地図ドラッグ）、運賃詳細、検証、公開ゲート表示、warning承認記録API保存、revision/publish/smoke UI MVP | 公開ワークフローの実運用導線 |
+| API | MVP完了 | spec lockファイル永続化、HTTP検収、revision/publish、public URL smoke、token認証、監査ログ、RT Alerts/Vehicles/TripUpdates配信 | DB永続化、本格RBAC |
 | GTFS-RT | 約94% / Beta手前 | ServiceAlerts、RT中継＋source運用UI、VehiclePositions地図デバッグ、TripUpdates core/API MVP、trip候補・block_id/GPS絞り込み・進捗推定、車両位置連動MVP、候補評価JSON/CSV入力/結果表示/出力、鮮度SLO表示、stale policy、監査ログMVP、公開URL smoke、静的GTFS参照ID照合API/Web、source revision照合/activeFrom予約MVP | 実データ評価 |
 | 運用品質 | 未完 | CLI検収、内部テスト、ロードマップ管理 | CI、公開URL smoke、監査ログ、実運用手順 |
 
@@ -27,7 +27,7 @@
 |----|------|----------|------|
 | P0-1 | v4 golden sampleを標準validatorで検証 | minimal / overnight / calendar_dates / translations / shape の validator error 0 を証跡化 | ✅ V4-4 |
 | P0-2 | validator実行をCIまたは定型コマンド化 | `pnpm` から検収が再現でき、失敗時にログが残る | ✅ Gitea Actions定義追加 / runner実績待ち |
-| P0-3 | 実データまたは匿名化データの回帰セットを固定 | 取込→再出力→検証を継続実行できる | V4-4 |
+| P0-3 | 実データまたは匿名化データの回帰セットを固定 | 取込→再出力→検証を継続実行できる | ⏳ V4-4 CLI/manifest/匿名化CLI追加 / データ未固定 |
 
 ### P1: 公開ワークフローを形にする
 
@@ -35,7 +35,7 @@
 |----|------|----------|------|
 | P1-1 | revision保存 | zip、validation結果、spec lock snapshotを版として保持 | V4-6 |
 | P1-2 | publish / latest URL | version固定URLとlatest URLを配信できる | V4-6 |
-| P1-3 | public URL smoke | 公開URLからzip取得、内部検証、標準validator結果取込ができる | V4-6 / RT-5 |
+| P1-3 | public URL smoke | 公開URLからzip取得、内部検証、標準validator結果取込ができる | ✅ V4-6 API MVP / RT-5 |
 
 ### P2: RTを運用可能に近づける
 
@@ -79,7 +79,7 @@
 
 1. 実データ回帰セットの方針を決める。
 2. revision保存と publish URL を実装する。
-3. public URL smoke を作る。
+3. 実データ回帰セットを固定する。
 4. RT VehiclePositions地図表示とTripUpdates実ログ評価へ進む。
 5. Web編集の実務操作（shape編集、運賃詳細、warning承認）を埋める。
 
@@ -93,14 +93,14 @@
 | S1 | validator jar固定 | validator jarの版・配置・Java条件を固定し、ローカルで再現可能 | ✅ MVP: `pnpm gtfs:validator:install` / `tools/gtfs-validator.jar` / `GTFS_VALIDATOR_JAR` を採用 |
 | S2 | `pnpm` 検収コマンド化 | `pnpm gtfs:validate` 等で内部検証＋標準validator＋検収を実行できる | ✅ MVP: `pnpm gtfs:validate <gtfs.zip>` を追加 |
 | S3 | v4 golden標準validator通過 | minimal / overnight / calendar_dates / translations / shape が標準validator error 0 | ✅ 完了: validator 8.0.1で5サンプル error 0（reportは `gtfs-tmp/golden-reports/`） |
-| S4 | 実データ回帰セット固定 | 実フィードまたは匿名化フィードを固定し、取込→再出力→検証が通る | 実務耐性の証跡 |
-| S5 | revision保存 | zip、内部検証、標準validator結果、spec lock snapshotを版として保存 | 公開履歴の土台 |
-| S6 | publish URL実装 | version固定URLとlatest URLを配信できる | 利用者向け公開 |
-| S7 | public URL smoke | 公開URLからzip取得、decode/検証/validator結果取込を確認 | 公開後品質確認 |
-| S8 | API認証・監査ログMVP | 公開・RT書き込み・設定変更にtoken認証と最低限の操作ログを付ける | 運用保護 |
+| S4 | 実データ回帰セット固定 | 実フィードまたは匿名化フィードを固定し、取込→再出力→検証が通る | ⏳ CLI/manifest/匿名化CLI追加 / データ未固定 |
+| S5 | revision保存 | zip、内部検証、標準validator結果、spec lock snapshotを版として保存 | ✅ API MVP完了 |
+| S6 | publish URL実装 | version固定URLとlatest URLを配信できる | ✅ API MVP完了 |
+| S7 | public URL smoke | 公開URLからzip取得、decode/検証/validator結果取込を確認 | ✅ API MVP完了 |
+| S8 | API認証・監査ログMVP | 公開・RT書き込み・設定変更にtoken認証と最低限の操作ログを付ける | ✅ token/API監査MVP完了 |
 | S9 | RT地図・鮮度監視 | VehiclePositions地図表示、TripUpdates/VehiclePositions/Alertsの鮮度SLOを見られる | ✅ MVP完了 |
 | S10 | RT実ログ評価 | TripUpdates候補抽出の候補なし/一意/曖昧/正解一致率を実ログで評価 | RT精度評価 |
-| S11 | Web実務編集の穴埋め | shape編集、運賃詳細、warning承認、停留所/便の削除・並べ替えを実装 | 実務編集品質 |
+| S11 | Web実務編集の穴埋め | shape編集、運賃詳細、warning承認、停留所/便の削除・並べ替えを実装 | ⏳ MVP前進: 路線属性/shape表操作・地図ドラッグ/運賃/削除・並べ替え/warning承認API保存 |
 | S12 | 30日運用チェック | 鮮度逸脱、decode error、source error、公開URL smokeの記録が残る | 実務OK判定 |
 
 ### 100%判定の目安
@@ -111,4 +111,4 @@
 | 95% | S8〜S10完了。API/RTの最低限の運用保護とRT品質評価がある |
 | 100% | S11〜S12完了。Web編集の主要穴が埋まり、一定期間の運用証跡がある |
 
-確認なしで進めやすい次の順番は S4 の実データ回帰セット方針整理。実データをrepoへ入れるか、匿名化するかは確認が必要になる。
+確認なしで進めやすい次の順番は S4 の manifest に載せる実データ候補の選定。実データをrepoへ入れるか、匿名化するかは確認が必要になる。

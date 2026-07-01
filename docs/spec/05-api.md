@@ -192,14 +192,37 @@
 | メソッド | パス | 説明 |
 |----------|------|------|
 | GET | `/projects/{project}/revisions` | 版一覧 |
-| POST | `/projects/{project}/revisions` | 版作成（検証→スナップショット） |
+| POST | `/projects/{project}/revisions` | 版作成（検証→スナップショット、MVPでは任意のtoken認証） |
 | GET | `/projects/{project}/revisions/{rev}` | 版詳細 |
 | GET | `/projects/{project}/revisions/{rev}/diff?base={rev2}` | 版差分 |
-| POST | `/projects/{project}/revisions/{rev}:publish` | 公開（即時 or `effective_date` 予約） |
+| POST | `/projects/{project}/revisions/{rev}:publish` | 公開（即時 or `effective_date` 予約、MVPでは任意のtoken認証） |
 | POST | `/projects/{project}/revisions/{rev}:rollback` | 最新版エイリアスを当該版へ |
+| POST | `/projects/{project}/revisions/{rev}/public-url-smoke` | 公開URLからzipを取得し、保存済み版との同一性・内部検証・標準validator reportを確認（MVPでは任意のtoken認証） |
+| GET | `/projects/{project}/revisions/{rev}/warning-approvals` | 当該版に紐づくwarning承認記録を取得 |
+| PUT | `/projects/{project}/revisions/{rev}/warning-approvals` | warning承認記録を保存（MVPでは任意のtoken認証） |
 | POST | `/projects/{project}/revisions/{rev}:submit-repository` | GTFSデータリポジトリ（gtfs-data.jp）へ登録/更新（F-7-7、連携設定要） |
 | GET | `/projects/{project}/revisions/{rev}/gtfs.zip` | 当該版の zip ダウンロード（要認証） |
+| GET | `/projects/{project}/latest/gtfs.zip` | 最新公開版の zip ダウンロード |
+| GET | `/projects/{project}/audit` | revision作成・publish・public URL smokeの監査ログを取得（MVPではtoken設定時のみ認証） |
 | GET | `/projects/{project}/export.zip?profile=` | 作業データから即時生成（プレビュー用） |
+
+warning承認記録の保存リクエスト例:
+
+```jsonc
+{
+  "approvals": [
+    {
+      "key": "missing_contact:{...}:0",
+      "code": "missing_contact",
+      "message": "agency/feed_infoに問い合わせ先がありません",
+      "entity": { "type": "agency", "id": "agency_1" },
+      "impact": "問い合わせ窓口は自治体ページで案内済み",
+      "approver": "ops@example.com",
+      "approvedAt": "2026-07-01T09:00:00Z"
+    }
+  ]
+}
+```
 
 ### 版状態遷移
 

@@ -28,6 +28,7 @@ button, .file-btn {
   background: #fff; color: #222; cursor: pointer;
 }
 button.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+button.danger { border-color: #f0c0c6; color: #9f1025; background: #fff5f6; }
 button:disabled { opacity: 0.5; cursor: default; }
 .file-btn { display: inline-block; background: #2ea043; border-color: #2ea043; color: #fff; }
 
@@ -63,6 +64,42 @@ button:disabled { opacity: 0.5; cursor: default; }
 .source-panel h2, .source-panel-title h2 { margin: 0; font-size: 18px; }
 .source-panel p, .source-panel-title p { margin: 0; color: #57606a; }
 .file-btn.large { width: fit-content; padding: 8px 14px; font-weight: 600; }
+.api-import-panel { border-top: 1px solid #eaeef2; margin-top: 18px; padding-top: 18px; }
+.api-import-grid {
+  display: grid; grid-template-columns: repeat(5, minmax(96px, 1fr)) auto auto;
+  gap: 10px; align-items: end;
+}
+.api-import-grid label { display: grid; gap: 4px; font-size: 12px; color: #57606a; }
+.api-import-grid input,
+.api-import-grid select {
+  width: 100%; border: 1px solid #d0d7de; border-radius: 6px;
+  padding: 6px 8px; font: inherit; color: #222; background: #fff;
+}
+.api-import-meta { display: flex; gap: 12px; flex-wrap: wrap; color: #57606a; font-size: 12px; }
+.api-revision-list { display: grid; gap: 4px; margin-top: 2px; max-width: 100%; overflow-x: auto; }
+.api-revision-list-head,
+.api-revision-list button {
+  display: grid; grid-template-columns: minmax(160px, 1.2fr) 96px 92px 108px 128px 150px 96px;
+  gap: 8px; align-items: center; text-align: left;
+  min-width: 900px;
+}
+.api-revision-list-head {
+  padding: 0 12px 2px; color: #57606a; font-size: 11px; font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+.api-revision-list button {
+  border-color: #d0d7de; background: #fff;
+}
+.api-revision-list button.selected { border-color: #1f6feb; background: #f0f6ff; }
+.api-revision-list span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.revision-status {
+  width: fit-content; max-width: 100%; padding: 2px 7px; border-radius: 999px;
+  background: #eef2f6; color: #57606a; font-size: 12px;
+}
+.revision-status-published { background: #eaf6ec; color: #1a7f37; }
+.revision-status-validated { background: #eef6ff; color: #0969da; }
+.revision-status-superseded { background: #f6f8fa; color: #6e7781; }
 
 /* 停留所ビュー: 左テーブル＋右地図 */
 .stops-view { flex: 1; display: flex; min-height: 0; }
@@ -85,6 +122,11 @@ input.stop-name-input {
 }
 input.stop-name-input.kana { width: 120px; color: #666; font-size: 12px; }
 input.stop-name-input:hover, input.stop-name-input:focus { border-color: #1f6feb; background: #fff; }
+.row-actions { display: flex; align-items: center; gap: 4px; }
+.row-actions button {
+  min-width: 28px; padding: 3px 6px; border-radius: 4px;
+  font-size: 11px; line-height: 1.2;
+}
 .pane-footer { padding: 6px 12px; font-size: 12px; color: #666; border-top: 1px solid #eee; }
 
 .stops-map-pane { flex: 1; position: relative; min-width: 0; }
@@ -107,9 +149,34 @@ input.stop-name-input:hover, input.stop-name-input:focus { border-color: #1f6feb
 .route-draft { width: 130px; border: 1px solid #ccc; border-radius: 6px; padding: 5px 8px; }
 .headsign-draft { width: 150px; border: 1px solid #ccc; border-radius: 6px; padding: 5px 8px; }
 .inline-error { margin: 0 0 8px; color: #d7263d; font-size: 12px; }
+.route-detail-panel {
+  margin: 8px 0 12px; padding: 10px 12px;
+  border: 1px solid #d0d7de; border-radius: 8px; background: #f6f8fa;
+}
+.route-detail-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.route-detail-header h3 { margin: 0; font-size: 13px; color: #24292f; }
+.route-detail-grid {
+  display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 8px; align-items: end;
+}
+.route-detail-grid label { display: grid; gap: 3px; font-size: 12px; color: #57606a; }
+.route-detail-grid label.wide { grid-column: span 2; }
+.route-detail-grid input,
+.route-detail-grid select {
+  width: 100%; min-width: 0; border: 1px solid #d0d7de; border-radius: 6px;
+  padding: 5px 8px; font: inherit; color: #222; background: #fff;
+}
+.route-detail-grid .color-code { font-family: ui-monospace, monospace; text-transform: uppercase; }
 .pattern h3 { margin: 16px 0 6px; font-size: 14px; }
 .pattern h3 small { color: #888; font-weight: normal; }
 table.timetable th .sub { font-size: 10px; color: #888; font-weight: normal; }
+.trip-actions {
+  display: grid; grid-template-columns: repeat(2, minmax(32px, 1fr));
+  gap: 3px; margin-top: 5px; min-width: 92px;
+}
+.trip-actions button {
+  padding: 2px 4px; border-radius: 4px; font-size: 10px; line-height: 1.25;
+}
 table.timetable td, table.timetable th { border: 1px solid #eee; }
 th.sticky, td.sticky { position: sticky; left: 0; background: #f6f8fa; z-index: 2; }
 td.stop-name { font-size: 13px; }
@@ -244,12 +311,43 @@ tr.warning td:first-child { color: #b07d10; font-weight: 600; }
   margin-top: 16px; padding-top: 12px; border-top: 1px solid #eee;
 }
 
+/* 運賃ビュー */
+.fares-view { flex: 1; overflow: auto; padding: 16px; background: #fff; }
+.fare-section { margin: 0 0 20px; }
+.fare-section select,
+.fare-section input {
+  width: 100%; min-width: 0; border: 1px solid #d0d7de; border-radius: 6px;
+  padding: 5px 8px; font: inherit; background: #fff;
+}
+.fare-section select { min-width: 110px; }
+.fare-section .fare-price { width: 86px; font-family: ui-monospace, monospace; }
+.fare-section .fare-short { width: 76px; font-family: ui-monospace, monospace; }
+.fare-section .fare-id-input { width: 120px; font-family: ui-monospace, monospace; }
+.fare-section .attribution-name-input { min-width: 180px; }
+.check-cell { text-align: center; }
+.fare-section .check-cell input { width: auto; }
+.empty-row { color: #57606a; text-align: center; padding: 18px 8px; }
+
+/* shape編集 */
+.shapes-view { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(440px, 0.9fr) 1.1fr; background: #fff; }
+.shape-editor { min-width: 0; display: flex; flex-direction: column; border-right: 1px solid #ddd; padding: 12px; overflow: auto; }
+.shape-editor select,
+.shape-editor input {
+  border: 1px solid #d0d7de; border-radius: 6px; padding: 5px 8px;
+  font: inherit; background: #fff;
+}
+.shape-editor .coord { width: 98px; font-family: ui-monospace, monospace; }
+.shape-dist { width: 92px; font-family: ui-monospace, monospace; }
+.shape-map-pane { position: relative; min-width: 0; min-height: 420px; }
+
 /* 公開ゲートビュー */
 .release-gate-view { flex: 1; overflow: auto; padding: 16px; background: #fff; }
 .release-gate-view .summary { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
 .gate-section { margin: 16px 0; }
 .gate-section h3 { font-size: 13px; margin: 0 0 8px; color: #24292f; }
 .gate-section .hint { font-size: 12px; color: #888; margin-left: 8px; }
+.gate-section .section-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.button-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .validator-info { font-size: 12px; color: #57606a; margin-left: 8px; }
 .lock-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; max-width: 480px; }
 .lock-list .lock {
@@ -262,6 +360,23 @@ tr.warning td:first-child { color: #b07d10; font-weight: 600; }
 .check-pass { color: #2ea043; }
 .check-fail { color: #d7263d; }
 .check-skip { color: #999; }
+.warning-approvals input {
+  width: 100%; min-width: 140px; border: 1px solid #d0d7de; border-radius: 6px;
+  padding: 5px 8px; font: inherit;
+}
+.warning-approvals td:nth-child(2) { white-space: normal; min-width: 280px; }
+.approval-api-form {
+  display: flex; align-items: end; gap: 8px; flex-wrap: wrap;
+  padding: 8px 0; color: #57606a; font-size: 12px;
+}
+.approval-api-form label { display: grid; gap: 3px; }
+.approval-api-form label.wide { min-width: 320px; flex: 1; }
+.approval-api-form input {
+  width: 150px; border: 1px solid #d0d7de; border-radius: 6px;
+  padding: 5px 8px; font: inherit; color: #222;
+}
+.approval-api-form label.wide input { width: 100%; }
+.approval-status { font-size: 12px; color: #57606a; margin: 0 0 8px; }
 
 /* トップ（モード選択ランディング） */
 .brand { cursor: pointer; user-select: none; }

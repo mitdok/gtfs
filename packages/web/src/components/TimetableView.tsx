@@ -24,7 +24,30 @@ interface Props {
 
 const TRIP_COLUMNS = ["route_id", "service_id", "trip_id", "trip_headsign"];
 const STOP_TIME_COLUMNS = ["trip_id", "arrival_time", "departure_time", "stop_id", "stop_sequence"];
-const ROUTE_COLUMNS = ["route_id", "agency_id", "route_short_name", "route_long_name", "route_type"];
+const ROUTE_COLUMNS = [
+  "route_id",
+  "agency_id",
+  "route_short_name",
+  "route_long_name",
+  "route_desc",
+  "route_type",
+  "route_url",
+  "route_color",
+  "route_text_color",
+];
+
+const ROUTE_TYPES = [
+  { value: "0", label: "路面電車" },
+  { value: "1", label: "地下鉄" },
+  { value: "2", label: "鉄道" },
+  { value: "3", label: "バス" },
+  { value: "4", label: "フェリー" },
+  { value: "5", label: "ケーブルカー" },
+  { value: "6", label: "ロープウェイ" },
+  { value: "7", label: "鋼索鉄道" },
+  { value: "11", label: "トロリーバス" },
+  { value: "12", label: "モノレール" },
+];
 
 function ensureTable(feed: Feed, name: string, columns: string[]): FeedTable {
   const existing = getTable(feed, name);
@@ -55,6 +78,18 @@ export function TimetableView({ feed, version, mutateFeed }: Props) {
   const [newTripHeadsign, setNewTripHeadsign] = useState("");
   const [addError, setAddError] = useState("");
   const effectiveRouteId = routeId !== "" ? routeId : (routes[0]?.routeId ?? "");
+  const selectedRoute = useMemo(
+    () => getRows(feed, "routes").find((row) => (row["route_id"] ?? "") === effectiveRouteId),
+    [feed, version, effectiveRouteId],
+  );
+  const agencies = useMemo(
+    () =>
+      getRows(feed, "agency").map((row) => ({
+        id: row["agency_id"] ?? "",
+        label: row["agency_name"] || row["agency_id"] || "agency",
+      })),
+    [feed, version],
+  );
 
   const groups = useMemo(
     () => (effectiveRouteId !== "" ? buildPatternGroups(feed, effectiveRouteId) : []),
@@ -69,6 +104,53 @@ export function TimetableView({ feed, version, mutateFeed }: Props) {
     });
   };
 
+  const deleteTrip = (tripId: string) => {
+    mutateFeed((f) => {
+      const tripsTable = getTable(f, "trips");
+      if (tripsTable) tripsTable.rows = tripsTable.rows.filter((row) => (row["trip_id"] ?? "") !== tripId);
+
+      const stopTimesTable = getTable(f, "stop_times");
+      if (stopTimesTable) {
+        stopTimesTable.rows = stopTimesTable.rows.filter((row) => (row["trip_id"] ?? "") !== tripId);
+      }
+    });
+  };
+
+  const duplicateTrip = (tripId: string) => {
+    mutateFeed((f) => {
+      const tripsTable = ensureTable(f, "trips", TRIP_COLUMNS);
+      const stopTimesTable = ensureTable(f, "stop_times", STOP_TIME_COLUMNS);
+      const sourceTrip = tripsTable.rows.find((row) => (row["trip_id"] ?? "") === tripId);
+      if (!sourceTrip) return;
+
+      const newTripId = nextId(tripsTable.rows, "trip_id", "T");
+      tripsTable.rows.push({
+        ...sourceTrip,
+        trip_id: newTripId,
+        trip_headsign: sourceTrip["trip_headsign"] ?? "",
+      });
+
+      const sourceStopTimes = stopTimesTable.rows
+        .filter((row) => (row["trip_id"] ?? "") === tripId)
+        .sort((a, b) => Number(a["stop_sequence"] ?? 0) - Number(b["stop_sequence"] ?? 0));
+      for (const row of sourceStopTimes) {
+        stopTimesTable.rows.push({ ...row, trip_id: newTripId });
+      }
+    });
+  };
+
+  const shiftTripTimes = (tripId: string, deltaSec: number) => {
+    mutateFeed((f) => {
+      for (const row of getRows(f, "stop_times")) {
+        if ((row["trip_id"] ?? "") !== tripId) continue;
+        for (const field of ["arrival_time", "departure_time"]) {
+          const sec = hmsToSec(row[field] ?? "");
+          if (sec !== null) row[field] = secToHms(Math.max(0, sec + deltaSec));
+        }
+      }
+    });
+  };
+
   const addRoute = () => {
     let createdId = "";
     mutateFeed((f) => {
@@ -80,13 +162,25 @@ export function TimetableView({ feed, version, mutateFeed }: Props) {
         agency_id: getRows(f, "agency")[0]?.["agency_id"] ?? "",
         route_short_name: name,
         route_long_name: "",
+        route_desc: "",
         route_type: "3",
+        route_url: "",
+        route_color: "",
+        route_text_color: "",
       });
       createdId = routeId;
     });
     setRouteId(createdId);
     setNewRouteName("新しい路線");
     setAddError("");
+  };
+
+  const editRouteField = (field: string, value: string) => {
+    mutateFeed((f) => {
+      const table = ensureTable(f, "routes", ROUTE_COLUMNS);
+      const row = table.rows.find((route) => (route["route_id"] ?? "") === effectiveRouteId);
+      if (row) row[field] = value;
+    });
   };
 
   const addTrip = () => {
@@ -211,6 +305,73 @@ export function TimetableView({ feed, version, mutateFeed }: Props) {
       </div>
       {addError !== "" && <div className="inline-error">{addError}</div>}
 
+      {selectedRoute && (
+        <section className="route-detail-panel">
+          <div className="route-detail-header">
+            <h3>路線属性</h3>
+            <span className="mono">{effectiveRouteId}</span>
+          </div>
+          <div className="route-detail-grid">
+            <label>
+              agency
+              <select value={selectedRoute["agency_id"] ?? ""} onChange={(e) => editRouteField("agency_id", e.target.value)}>
+                <option value=""></option>
+                {agencies.map((agency) => (
+                  <option key={agency.id} value={agency.id}>
+                    {agency.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              種別
+              <select value={selectedRoute["route_type"] ?? ""} onChange={(e) => editRouteField("route_type", e.target.value)}>
+                <option value=""></option>
+                {ROUTE_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.value}: {type.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              短縮名
+              <input value={selectedRoute["route_short_name"] ?? ""} onChange={(e) => editRouteField("route_short_name", e.target.value)} />
+            </label>
+            <label>
+              正式名
+              <input value={selectedRoute["route_long_name"] ?? ""} onChange={(e) => editRouteField("route_long_name", e.target.value)} />
+            </label>
+            <label className="wide">
+              説明
+              <input value={selectedRoute["route_desc"] ?? ""} onChange={(e) => editRouteField("route_desc", e.target.value)} />
+            </label>
+            <label className="wide">
+              URL
+              <input value={selectedRoute["route_url"] ?? ""} onChange={(e) => editRouteField("route_url", e.target.value)} />
+            </label>
+            <label>
+              路線色
+              <input
+                className="color-code"
+                value={selectedRoute["route_color"] ?? ""}
+                onChange={(e) => editRouteField("route_color", e.target.value.toUpperCase())}
+                placeholder="0066CC"
+              />
+            </label>
+            <label>
+              文字色
+              <input
+                className="color-code"
+                value={selectedRoute["route_text_color"] ?? ""}
+                onChange={(e) => editRouteField("route_text_color", e.target.value.toUpperCase())}
+                placeholder="FFFFFF"
+              />
+            </label>
+          </div>
+        </section>
+      )}
+
       {groups.map((g, gi) => (
         <section key={g.key} className="pattern">
           <h3>
@@ -225,6 +386,33 @@ export function TimetableView({ feed, version, mutateFeed }: Props) {
                     <th key={t.tripId} title={`trip_id: ${t.tripId}\nservice: ${t.serviceId}`}>
                       {t.headsign || t.tripId}
                       <div className="sub">{t.serviceId}</div>
+                      <div className="trip-actions">
+                        <button
+                          type="button"
+                          title="5分繰り上げ"
+                          onClick={() => shiftTripTimes(t.tripId, -5 * 60)}
+                        >
+                          -5
+                        </button>
+                        <button
+                          type="button"
+                          title="5分繰り下げ"
+                          onClick={() => shiftTripTimes(t.tripId, 5 * 60)}
+                        >
+                          +5
+                        </button>
+                        <button type="button" title="便を複製" onClick={() => duplicateTrip(t.tripId)}>
+                          複製
+                        </button>
+                        <button
+                          type="button"
+                          className="danger"
+                          title="便を削除"
+                          onClick={() => deleteTrip(t.tripId)}
+                        >
+                          削除
+                        </button>
+                      </div>
                     </th>
                   ))}
                 </tr>

@@ -15,6 +15,11 @@
  *     --release-candidate <ver>
  *     --roundtrip-errors <n>     実フィード回帰の標準validator error数(A-07の証跡)
  *     --v3-errors <n>            v3移行回帰の標準validator error数(A-08の証跡)
+ *     --regression-summary <summary.json>
+ *                               gtfs-regression の summary.json から A-07/A-08 を抽出
+ *     --roundtrip-case <id>      A-07 に使う regression case id
+ *     --v3-case <id>             A-08 に使う regression case id
+ *     --require-reviewed         regression case の review.ready=true を必須化
  *     --public-url-errors <n>    公開URL取得zipの標準validator error数(A-09の証跡)
  *     --out <acceptance.json>    検収結果(11.5)の出力先。未指定なら標準出力
  *
@@ -27,13 +32,14 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const { runAcceptancePipeline } = await import(resolve(here, "../dist/index.js"));
+const { evidenceFromRegressionSummary, runAcceptancePipeline } = await import(resolve(here, "../dist/index.js"));
 
 function parseArgs(argv) {
   const opts = { _: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a.startsWith("--")) opts[a.slice(2)] = argv[++i];
+    if (a === "--require-reviewed") opts["require-reviewed"] = true;
+    else if (a.startsWith("--")) opts[a.slice(2)] = argv[++i];
     else opts._.push(a);
   }
   return opts;
@@ -76,6 +82,13 @@ async function main() {
   const roundtripErrors = num(opts["roundtrip-errors"]);
   const v3Errors = num(opts["v3-errors"]);
   const publicUrlErrors = num(opts["public-url-errors"]);
+  const regressionEvidence = opts["regression-summary"]
+    ? evidenceFromRegressionSummary(await readFile(opts["regression-summary"], "utf8"), {
+        roundtripCaseId: opts["roundtrip-case"],
+        v3CaseId: opts["v3-case"],
+        requireReviewed: opts["require-reviewed"] === true,
+      })
+    : {};
 
   const result = runAcceptancePipeline({
     zip,
@@ -84,9 +97,14 @@ async function main() {
     standardReport,
     releaseCandidate: opts["release-candidate"],
     executedAt: new Date().toISOString(),
-    realFeedRoundtrip: roundtripErrors === undefined ? undefined : { standardErrors: roundtripErrors },
+    realFeedRoundtrip:
+      roundtripErrors === undefined
+        ? regressionEvidence.realFeedRoundtrip
+        : { standardErrors: roundtripErrors },
     v3Migration:
-      v3Errors === undefined ? undefined : { standardErrors: v3Errors, warningsReasonable: true },
+      v3Errors === undefined
+        ? regressionEvidence.v3Migration
+        : { standardErrors: v3Errors, warningsReasonable: true },
     publicUrl:
       publicUrlErrors === undefined ? undefined : { verified: true, standardErrors: publicUrlErrors },
   });

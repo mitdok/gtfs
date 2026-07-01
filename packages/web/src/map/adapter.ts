@@ -34,8 +34,9 @@ export interface MapAdapter {
   /** 拡張: 地図側からの選択（ピンのクリック）を UI へ伝える。 */
   onMarkerClick(cb: (id: string) => void): void;
 
-  // 線形（shape）。MVP では表示のみ（頂点編集は S-11 で実装）。
+  // 線形（shape）。editable=true では頂点ドラッグを onLineEdit で通知する。
   setLine(id: string, points: LngLat[], opts?: { editable?: boolean }): void;
+  removeLine(id: string): void;
   onLineEdit(cb: (id: string, points: LngLat[]) => void): void;
 
   // 地図操作・取得

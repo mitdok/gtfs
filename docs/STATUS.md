@@ -3,10 +3,10 @@
 仕様書（[`docs/spec/`](./spec/README.md)）に対して、`packages/core` の実装が
 どこまで到達しているかを一覧化する。変更履歴の詳細は [`../CHANGELOG.md`](../CHANGELOG.md) を参照。
 
-- 最終更新: 2026-06-30
+- 最終更新: 2026-07-01
 - 対象コミット: 本ファイルと同一リビジョン
-- コア・テスト: 117 件 pass（`pnpm --filter @gtfs-studio/core test`）
-- API・テスト: 24 件 pass（`pnpm --filter @gtfs-studio/api test`）
+- コア・テスト: 124 件 pass（`pnpm --filter @gtfs-studio/core test`）
+- API・テスト: 43 件 pass（`pnpm --filter @gtfs-studio/api test`）
 
 ## 0. ロードマップ
 
@@ -24,7 +24,7 @@ GTFS-RT が [`GTFS_RT_ROADMAP.md`](./GTFS_RT_ROADMAP.md)。
 | 検証 | `validateFeed` | ✅ 層1＋層2一部 | `src/validator.ts`, `src/profile.ts` |
 | 出力（内部モデル → zip） | `exportGtfsZip` | ✅ 基本 | `src/exporter.ts` |
 | 出力プロファイル準拠フィルタ | `applyExportProfile` / `ExportOptions.profileId` | ✅ | `src/export-profile.ts`, `src/exporter.ts` |
-| 公開可否ゲート | `evaluateReleaseGate` ＋ Web表示 | ✅ 判定＋公開ゲートタブ | `src/release-gate.ts`, `web/components/ReleaseGateView.tsx` |
+| 公開可否ゲート | `evaluateReleaseGate` ＋ Web表示 | ✅ 判定＋公開ゲートタブ＋warning承認記録MVP | `src/release-gate.ts`, `web/components/ReleaseGateView.tsx` |
 | 検収（A-01〜A-10） | `evaluateAcceptance` ＋ Web表示 | ✅ 11.5判定器＋公開ゲートに併載 | `src/acceptance.ts`, `web/components/ReleaseGateView.tsx` |
 | 検収パイプライン・CLI | `runAcceptancePipeline` / `gtfs-acceptance` | ✅ 11.4 検収コマンド | `src/pipeline.ts`, `bin/gtfs-acceptance.mjs` |
 | 新規GTFS-JP v4作成 | `createGtfsJpV4StarterFeed` ＋ Web画面 | ✅ 最小v4生成＋路線/停留所/便追加MVP | `src/starter-feed.ts`, `web/components/NewFeedView.tsx`, `web/components/StopsView.tsx`, `web/components/TimetableView.tsx` |
@@ -83,7 +83,7 @@ GTFS-RT が [`GTFS_RT_ROADMAP.md`](./GTFS_RT_ROADMAP.md)。
 
 ### ⏳ 未実装（残タスク）
 
-仕様ロックのDB永続化・認証、validator実体のCI連携、GTFS-RT TripUpdatesの車両位置連動・実データ評価。
+仕様ロックのDB永続化・本格RBAC、validator実体のCI連携、GTFS-RT TripUpdatesの実データ評価。
 
 ## 5. 仕様ロック・標準バリデータ連携・検収（仕様 10.2 / 10.7 / 10.9 / 10.10 / 11章）
 
@@ -93,6 +93,7 @@ GTFS-RT が [`GTFS_RT_ROADMAP.md`](./GTFS_RT_ROADMAP.md)。
 | MobilityData Validator レポート取込（10.7 step3） | ✅ `report.json` 取込・集計 | `src/standard-validator.ts` |
 | validator結果からの `VALIDATOR_LOCK` 生成（11.2） | ✅ | `src/standard-validator.ts` |
 | v4 golden sample標準validator回帰 | ✅ validator 8.0.1で5サンプル error 0 / CI定義追加 | `src/v4-golden-samples.ts`, `scripts/gtfs-validate-golden.mjs`, `.gitea/workflows/ci.yml` |
+| 実データ回帰CLI・manifest・匿名化CLI | ✅ 実行基盤MVP / データ未固定 | `scripts/gtfs-regression.mjs`, `scripts/gtfs-anonymize.mjs`, `src/regression-summary.ts`, `docs/REGRESSION.md` |
 | 実データ検収 A-01〜A-10（11.1/11.5） | ✅ 判定器 | `src/acceptance.ts` |
 | プロファイル定義の外部データ化（10.11） | ✅ `src/profiles/*.json` 正本化 | `src/profile.ts`, `src/profile-schema.ts` |
 | 仕様ロックの保存・取得ストア（10.2） | ✅ インメモリ | `src/spec-lock.ts`（`createSpecLockStore`） |
@@ -100,7 +101,13 @@ GTFS-RT が [`GTFS_RT_ROADMAP.md`](./GTFS_RT_ROADMAP.md)。
 | 検収CLI（11.4 検収コマンド） | ✅ `gtfs-acceptance`（report取込・Java起動・回帰証跡） | `bin/gtfs-acceptance.mjs` |
 | 仕様ロックの永続化（ファイル）・HTTP公開（10.2） | ✅ `packages/api` | `api/src/spec-lock-repository.ts`, `api/src/server.ts` |
 | 検収のHTTP実行（11.4） | ✅ `POST /acceptance` | `api/src/server.ts` |
-| 仕様ロックのDB永続化・認証 | ⏳ 未実装（将来） | — |
+| revision保存・publish配信API | ✅ ファイル永続化MVP＋一覧limit | `api/src/revision-repository.ts`, `api/src/server.ts` |
+| public URL smoke API | ✅ zip取得・ハッシュ照合・内部検証・標準report取込MVP | `api/src/server.ts` |
+| 静的GTFS API token認証・監査ログ | ✅ revision作成/publish/smoke MVP | `api/src/server.ts` |
+| Web warning承認記録 | ✅ ブラウザ内承認＋JSON控え＋revision API保存MVP | `web/components/ReleaseGateView.tsx`, `api/src/revision-repository.ts`, `api/src/server.ts` |
+| Web実務編集 | ✅ 路線属性詳細・shape表操作＋地図ドラッグMVP | `web/components/TimetableView.tsx`, `web/components/ShapesView.tsx`, `web/map/maplibreAdapter.ts` |
+| Web公開ワークフロー | ✅ revision保存・承認記録同時保存・publish・public URL smoke UI、API revision/latest再読込、revision文脈同期、API仕様ロック読込、回帰summary取込MVP | `web/components/ReleaseGateView.tsx`, `web/App.tsx` |
+| 仕様ロックのDB永続化・本格RBAC | ⏳ 未実装（将来） | — |
 
 > validator の実行（Java実体）はコア本体では行わず、CLI（`gtfs-acceptance --validator-jar`）が
 > 起動するか、別途実行した `report.json` を `--report` で取り込む。判定は `runAcceptancePipeline` に集約。
@@ -115,7 +122,7 @@ GTFS-JP v4対応の詳細ロードマップと進捗率は
 3. ~~公開ゲートのWeb表示~~ … ✅ 完了（`web/components/ReleaseGateView.tsx`、公開ゲートタブ）。
 4. ~~検収パイプライン・CLI（11.4）／検収レポートのWeb表示~~ … ✅ 完了（`pipeline.ts` / `bin/gtfs-acceptance.mjs` / 公開ゲートにA-01〜A-10併載）。
 5. ~~仕様ロックの永続化・API層~~ … ✅ 完了（`packages/api`：node:http・依存ゼロ、ファイル永続化＋`POST /acceptance`）。
-6. （以降）実データ回帰セット固定、仕様ロックの**DB永続化・認証**、Gitea Actions runner実績確認、GTFS-RT TripUpdatesの車両位置連動・実データ評価。
+6. （以降）実データ候補の最終選定・許諾レビュー、仕様ロックの**DB永続化・本格RBAC**、Gitea Actions runner実績確認、GTFS-RT TripUpdatesの実データ評価。
 
 ## 7. GTFS-RT対応
 
