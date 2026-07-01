@@ -40,6 +40,15 @@ pnpm -r test       # 全パッケージテスト
 - ロードマップ、TODO、進捗メモを意識し、実装内容に合わせて更新する。
 - 大きな変更は一度にまとめず、調査、設計メモ、最小実装、検証、記録、pushの順に段階を踏んで進める。
 
+## Web公開とdashboard連携
+
+- 作業ハブ: `http://dc-storage/project/hdd20tb/project-gtfs/`
+- GTFS current: `http://dc-storage/project/hdd20tb/project-gtfs/public/current/`
+- dashboard登録: `/mnt/hdd20tb/project-dashboard/assets/app.js` の `project-gtfs` inventory
+
+Web公開物は作業ハブ側の `project-gtfs/public/current/` に集約し、実体の開発とGitea管理はこのリポジトリ `/mnt/hdd20tb/project/gtfs` を正本とする。
+新しい公開ビルド、validator report viewer、運用画面を追加した場合は、このREADME、`/mnt/hdd20tb/project-gtfs/README.md`、`project-dashboard/assets/app.js` を合わせて更新し、dashboardから辿れる状態にする。
+
 ### 検収・標準validator
 
 ```bash
