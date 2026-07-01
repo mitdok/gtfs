@@ -352,15 +352,27 @@ export function createApiServer(options: ApiOptions): Server {
       const projectId = decodeURIComponent(revisionsRootMatch[1]!);
       if (method === "GET") {
         const limitParam = url.searchParams.get("limit");
+        const offsetParam = url.searchParams.get("offset");
         const statusParam = url.searchParams.get("status");
         if (statusParam !== null && !VALID_REVISION_STATUSES.has(statusParam)) {
           return sendJson(res, 400, { error: "invalid revision status" });
         }
-        const all = revisions
-          .list(projectId)
-          .filter((revision) => statusParam === null || revision.status === statusParam);
+        const projectRevisions = revisions.list(projectId);
+        const statusCounts = projectRevisions.reduce(
+          (counts, revision) => ({ ...counts, [revision.status]: counts[revision.status] + 1 }),
+          { validated: 0, published: 0, superseded: 0 },
+        );
+        const all = projectRevisions.filter((revision) => statusParam === null || revision.status === statusParam);
         const limit = limitParam === null ? all.length : Math.max(1, Math.min(500, Number(limitParam) || 100));
-        return sendJson(res, 200, { revisions: all.slice(0, limit), total: all.length, limit });
+        const offset = Math.max(0, Number(offsetParam) || 0);
+        return sendJson(res, 200, {
+          revisions: all.slice(offset, offset + limit),
+          total: all.length,
+          limit,
+          offset,
+          hasMore: offset + limit < all.length,
+          statusCounts,
+        });
       }
       if (method === "POST") {
         const auth = authorizeStaticWrite(req);

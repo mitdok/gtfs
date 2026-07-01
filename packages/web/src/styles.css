@@ -76,6 +76,17 @@ button:disabled { opacity: 0.5; cursor: default; }
   padding: 6px 8px; font: inherit; color: #222; background: #fff;
 }
 .api-import-meta { display: flex; gap: 12px; flex-wrap: wrap; color: #57606a; font-size: 12px; }
+.api-revision-counts,
+.api-revision-pager {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  color: #57606a; font-size: 12px;
+}
+.api-revision-counts button {
+  padding: 3px 8px; border-radius: 999px; border-color: #d0d7de;
+  background: #f6f8fa; color: #57606a; font-size: 12px;
+}
+.api-revision-counts button:hover { border-color: #1f6feb; color: #0969da; }
+.api-revision-pager button { min-width: 64px; }
 .api-revision-list { display: grid; gap: 4px; margin-top: 2px; max-width: 100%; overflow-x: auto; }
 .api-revision-list-head,
 .api-revision-list button {
@@ -93,6 +104,21 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 .api-revision-list button.selected { border-color: #1f6feb; background: #f0f6ff; }
 .api-revision-list span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.api-revision-detail {
+  display: grid; gap: 8px; padding: 10px 12px;
+  border: 1px solid #d0d7de; border-radius: 8px; background: #f6f8fa;
+}
+.api-revision-detail-title { display: flex; align-items: center; gap: 8px; }
+.api-revision-detail dl {
+  display: grid; grid-template-columns: repeat(4, minmax(110px, 1fr));
+  gap: 8px; margin: 0;
+}
+.api-revision-detail dl div {
+  min-width: 0; padding: 6px 8px; border: 1px solid #eaeef2; border-radius: 6px; background: #fff;
+}
+.api-revision-detail dt { color: #57606a; font-size: 11px; }
+.api-revision-detail dd { margin: 2px 0 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.api-revision-detail-hash { color: #57606a; overflow: hidden; text-overflow: ellipsis; }
 .revision-status {
   width: fit-content; max-width: 100%; padding: 2px 7px; border-radius: 999px;
   background: #eef2f6; color: #57606a; font-size: 12px;

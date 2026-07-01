@@ -33,10 +33,26 @@ interface ApiRevisionItem {
   zipSha256?: string;
 }
 
+interface ApiRevisionDetail extends ApiRevisionItem {
+  updatedAt?: string;
+  zipBytes?: number;
+  releaseCandidate?: string;
+  acceptance?: { status?: string; checks?: { status: string }[] };
+  gate?: { status?: string; blockers?: { code: string; message: string }[] };
+  validation?: {
+    gtfsJpV4?: { errors: number; warnings: number };
+    googleTransitReady?: { errors: number; warnings: number };
+  };
+  warningApprovals?: unknown[];
+}
+
 interface ApiRevisionListResponse {
   revisions: ApiRevisionItem[];
   total?: number;
   limit?: number;
+  offset?: number;
+  hasMore?: boolean;
+  statusCounts?: Record<"validated" | "published" | "superseded", number>;
 }
 
 const PROFILE_OPTIONS: { id: ProfileId; label: string }[] = [
@@ -69,6 +85,11 @@ export function App() {
   const [apiRevisionLimit, setApiRevisionLimit] = useState(20);
   const [apiRevisionTotal, setApiRevisionTotal] = useState<number | null>(null);
   const [apiRevisionStatus, setApiRevisionStatus] = useState<ApiRevisionStatusFilter>("all");
+  const [apiRevisionOffset, setApiRevisionOffset] = useState(0);
+  const [apiRevisionHasMore, setApiRevisionHasMore] = useState(false);
+  const [apiRevisionStatusCounts, setApiRevisionStatusCounts] = useState<ApiRevisionListResponse["statusCounts"] | null>(null);
+  const [apiRevisionDetail, setApiRevisionDetail] = useState<ApiRevisionDetail | null>(null);
+  const [apiRevisionDetailStatus, setApiRevisionDetailStatus] = useState("");
 
   const revalidate = useCallback(
     (feed: Feed, nextProfileId = profileId) => {
@@ -152,7 +173,7 @@ export function App() {
     }
   }, [apiProjectId, apiRevisionId, apiToken, enterEditor]);
 
-  const onApiRevisionList = useCallback(async () => {
+  const loadApiRevisionList = useCallback(async (nextOffset: number, nextStatus = apiRevisionStatus) => {
     const projectId = apiProjectId.trim();
     if (projectId === "") {
       setApiImportStatus("project ID を入力してください。");
@@ -161,19 +182,55 @@ export function App() {
     try {
       setApiImportStatus("revision一覧を読み込み中...");
       const limit = Math.max(1, Math.min(500, Math.floor(apiRevisionLimit) || 20));
-      const params = new URLSearchParams({ limit: String(limit) });
-      if (apiRevisionStatus !== "all") params.set("status", apiRevisionStatus);
+      const offset = Math.max(0, nextOffset);
+      const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+      if (nextStatus !== "all") params.set("status", nextStatus);
       const body = await apiJson<ApiRevisionListResponse>(
         `/projects/${encodeURIComponent(projectId)}/revisions?${params.toString()}`,
         apiToken.trim() === "" ? undefined : { headers: { authorization: `Bearer ${apiToken.trim()}` } },
       );
       setApiRevisions(body.revisions);
       setApiRevisionTotal(body.total ?? body.revisions.length);
+      setApiRevisionOffset(body.offset ?? offset);
+      setApiRevisionHasMore(Boolean(body.hasMore));
+      setApiRevisionStatusCounts(body.statusCounts ?? null);
       setApiImportStatus(`revision一覧: ${body.revisions.length}/${body.total ?? body.revisions.length}件`);
     } catch (e) {
       setApiImportStatus(`revision一覧エラー: ${(e as Error).message}`);
     }
   }, [apiProjectId, apiRevisionLimit, apiRevisionStatus, apiToken]);
+
+  const onApiRevisionList = useCallback(() => {
+    void loadApiRevisionList(0);
+  }, [loadApiRevisionList]);
+
+  const selectApiRevisionStatus = useCallback(
+    (nextStatus: ApiRevisionStatusFilter) => {
+      setApiRevisionStatus(nextStatus);
+      void loadApiRevisionList(0, nextStatus);
+    },
+    [loadApiRevisionList],
+  );
+
+  const loadApiRevisionDetail = useCallback(
+    async (revisionId: string) => {
+      const projectId = apiProjectId.trim();
+      if (projectId === "" || revisionId.trim() === "") return;
+      try {
+        setApiRevisionDetailStatus("revision詳細を読み込み中...");
+        const detail = await apiJson<ApiRevisionDetail>(
+          `/projects/${encodeURIComponent(projectId)}/revisions/${encodeURIComponent(revisionId)}`,
+          apiToken.trim() === "" ? undefined : { headers: { authorization: `Bearer ${apiToken.trim()}` } },
+        );
+        setApiRevisionDetail(detail);
+        setApiRevisionDetailStatus("");
+      } catch (e) {
+        setApiRevisionDetail(null);
+        setApiRevisionDetailStatus(`revision詳細エラー: ${(e as Error).message}`);
+      }
+    },
+    [apiProjectId, apiToken],
+  );
 
   const onDownload = useCallback(() => {
     const feed = feedRef.current;
@@ -346,6 +403,22 @@ export function App() {
                   一覧
                 </button>
               </div>
+              {apiRevisionStatusCounts && (
+                <div className="api-revision-counts">
+                  <button type="button" onClick={() => selectApiRevisionStatus("all")}>
+                    all {apiRevisionStatusCounts.validated + apiRevisionStatusCounts.published + apiRevisionStatusCounts.superseded}
+                  </button>
+                  <button type="button" onClick={() => selectApiRevisionStatus("published")}>
+                    published {apiRevisionStatusCounts.published}
+                  </button>
+                  <button type="button" onClick={() => selectApiRevisionStatus("validated")}>
+                    validated {apiRevisionStatusCounts.validated}
+                  </button>
+                  <button type="button" onClick={() => selectApiRevisionStatus("superseded")}>
+                    superseded {apiRevisionStatusCounts.superseded}
+                  </button>
+                </div>
+              )}
               {apiRevisions.length > 0 && (
                 <div className="api-revision-list">
                   <div className="api-revision-list-head">
@@ -362,7 +435,10 @@ export function App() {
                       key={revision.id}
                       type="button"
                       className={apiRevisionId === revision.id ? "selected" : ""}
-                      onClick={() => setApiRevisionId(revision.id)}
+                      onClick={() => {
+                        setApiRevisionId(revision.id);
+                        void loadApiRevisionDetail(revision.id);
+                      }}
                       title={revision.zipSha256}
                     >
                       <span className="mono">{revision.id}</span>
@@ -374,6 +450,84 @@ export function App() {
                       <span className="mono">{revision.zipSha256 ? revision.zipSha256.slice(0, 10) : "-"}</span>
                     </button>
                   ))}
+                </div>
+              )}
+              {(apiRevisionDetail || apiRevisionDetailStatus) && (
+                <div className="api-revision-detail">
+                  {apiRevisionDetail ? (
+                    <>
+                      <div className="api-revision-detail-title">
+                        <strong className="mono">{apiRevisionDetail.id}</strong>
+                        <span className={`revision-status revision-status-${apiRevisionDetail.status}`}>
+                          {apiRevisionDetail.status}
+                        </span>
+                      </div>
+                      <dl>
+                        <div>
+                          <dt>gate</dt>
+                          <dd>{apiRevisionDetail.gate?.status ?? "-"}</dd>
+                        </div>
+                        <div>
+                          <dt>acceptance</dt>
+                          <dd>{apiRevisionDetail.acceptance?.status ?? "-"}</dd>
+                        </div>
+                        <div>
+                          <dt>blockers</dt>
+                          <dd>{apiRevisionDetail.gate?.blockers?.length ?? 0}</dd>
+                        </div>
+                        <div>
+                          <dt>approvals</dt>
+                          <dd>{apiRevisionDetail.warningApprovals?.length ?? 0}</dd>
+                        </div>
+                        <div>
+                          <dt>GTFS-JP</dt>
+                          <dd>
+                            E{apiRevisionDetail.validation?.gtfsJpV4?.errors ?? "-"} / W
+                            {apiRevisionDetail.validation?.gtfsJpV4?.warnings ?? "-"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Google</dt>
+                          <dd>
+                            E{apiRevisionDetail.validation?.googleTransitReady?.errors ?? "-"} / W
+                            {apiRevisionDetail.validation?.googleTransitReady?.warnings ?? "-"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>bytes</dt>
+                          <dd>{apiRevisionDetail.zipBytes ?? "-"}</dd>
+                        </div>
+                        <div>
+                          <dt>updated</dt>
+                          <dd>{formatRevisionDate(apiRevisionDetail.updatedAt ?? apiRevisionDetail.createdAt)}</dd>
+                        </div>
+                      </dl>
+                      <div className="api-revision-detail-hash mono">{apiRevisionDetail.zipSha256 ?? "-"}</div>
+                    </>
+                  ) : (
+                    <span>{apiRevisionDetailStatus}</span>
+                  )}
+                </div>
+              )}
+              {apiRevisionTotal !== null && (
+                <div className="api-revision-pager">
+                  <button
+                    type="button"
+                    disabled={apiRevisionOffset === 0}
+                    onClick={() => void loadApiRevisionList(Math.max(0, apiRevisionOffset - apiRevisionLimit))}
+                  >
+                    前へ
+                  </button>
+                  <span>
+                    {apiRevisionOffset + 1}-{Math.min(apiRevisionOffset + apiRevisions.length, apiRevisionTotal)} / {apiRevisionTotal}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={!apiRevisionHasMore}
+                    onClick={() => void loadApiRevisionList(apiRevisionOffset + apiRevisionLimit)}
+                  >
+                    次へ
+                  </button>
                 </div>
               )}
               <div className="api-import-meta">

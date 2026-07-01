@@ -163,3 +163,44 @@ revision一覧はインポート補助ではなく、公開運用の入口にな
 最低限、status、gate、acceptance、publishedAt/createdAt、hashが同じ行で見えると、
 「公開中の版を再読込する」「未公開のready候補を確認する」「supersededを過去参照する」という操作を分けやすい。
 次に進めるなら、状態別件数、cursorページング、revision比較の順で足すのが自然。
+
+## 2026-07-02 revision一覧のページングと状態別件数
+
+### 違和感
+
+`limit` だけでは先頭ページを軽くできるが、次ページへ進めない。
+また `status=published` で絞った時に、未公開 validated が何件残っているかが同じ画面で分からない。
+
+### 対応
+
+- revision一覧APIに `offset`、`hasMore`、`statusCounts` を追加した。
+- WebのAPI revision読込に前後ページ移動と状態別件数チップを追加した。
+- 状態別件数は現在の `status` フィルタに関係なく project 全体で返し、公開済み・未公開・差し替え済みの分布を常に見られるようにした。
+
+### 得られた知見
+
+revision一覧は「検索結果」だけではなく「運用キュー」でもある。
+
+状態別件数があると、公開中の版を探す操作と、未公開 validated を処理する操作を同じ画面で切り替えられる。
+MVPでは `offset` で十分だが、DB化後に件数が大きくなる場合は `createdAt + id` ベースの cursor に置き換える方が安定する。
+
+## 2026-07-02 revision詳細の事前確認
+
+### 違和感
+
+revision一覧からIDを選んでGTFS zipを読み込むだけだと、その版が本当に作業対象なのかを読み込み後にしか判断できない。
+公開済みrevisionを確認したいだけなのか、未公開ready候補を開きたいのか、ブロッカーの残る版を調査したいのかが一覧上で判別しづらい。
+
+### 対応
+
+- WebのAPI revision一覧で行を選ぶと、revision詳細APIを読み込むようにした。
+- 詳細パネルに gate、acceptance、blocker数、warning承認数、GTFS-JP/Google検証件数、zip bytes、updated、sha256を表示した。
+- 状態別件数チップは、クリック時にその状態で一覧を再読込するようにした。
+
+### 得られた知見
+
+revision一覧から直接zipを開く前に、metadataだけで公開判断を進められる方が運用は軽い。
+
+特に hash、blocker数、承認数、validation summary が同じ場所に見えると、
+「この版を開く」「publishする前に公開ゲートで再確認する」「過去版として参照する」の判断が分かれる。
+次は詳細パネルから publish/smoke へ進む導線か、2 revision の metadata 差分比較を足すと自然。

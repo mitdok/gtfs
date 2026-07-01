@@ -186,7 +186,18 @@ describe("GTFS Studio API", () => {
     const body = await limited.json();
     expect(body.total).toBe(3);
     expect(body.limit).toBe(2);
+    expect(body.offset).toBe(0);
+    expect(body.hasMore).toBe(true);
+    expect(body.statusCounts).toEqual({ validated: 3, published: 0, superseded: 0 });
     expect(body.revisions).toHaveLength(2);
+
+    const next = await fetch(`${base}/projects/demo/revisions?limit=2&offset=2`);
+    expect(next.status).toBe(200);
+    const nextBody = await next.json();
+    expect(nextBody.total).toBe(3);
+    expect(nextBody.offset).toBe(2);
+    expect(nextBody.hasMore).toBe(false);
+    expect(nextBody.revisions).toHaveLength(1);
   });
 
   it("ready な版だけ publish でき、latest zip として配信する", async () => {
@@ -247,6 +258,7 @@ describe("GTFS Studio API", () => {
     expect(publishedList.status).toBe(200);
     const publishedBody = await publishedList.json();
     expect(publishedBody.total).toBe(1);
+    expect(publishedBody.statusCounts).toEqual({ validated: 0, published: 1, superseded: 1 });
     expect(publishedBody.revisions.map((revision: { id: string }) => revision.id)).toEqual(["rev_ready_next"]);
 
     const supersededList = await fetch(`${base}/projects/demo/revisions?status=superseded`);

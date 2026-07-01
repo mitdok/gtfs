@@ -73,9 +73,11 @@ revision一覧:
 curl http://localhost:8787/projects/demo/revisions
 curl 'http://localhost:8787/projects/demo/revisions?limit=20'
 curl 'http://localhost:8787/projects/demo/revisions?status=published&limit=20'
+curl 'http://localhost:8787/projects/demo/revisions?status=validated&limit=20&offset=20'
 ```
 
 `status` は `validated` / `published` / `superseded` を指定できる。
+レスポンスには `total`、`limit`、`offset`、`hasMore`、`statusCounts` が含まれる。
 
 revision zip:
 
@@ -130,7 +132,7 @@ curl http://localhost:8787/projects/demo/audit \
 ## 運用上の注意
 
 - `latest/gtfs.zip` は最新公開revisionを返す。未publishのrevisionは latest にならない。
-- revision一覧は `limit` と `status` で絞り込める。長期運用では published 一覧や未公開 validated 一覧から作業対象を選ぶ。
+- revision一覧は `limit`、`offset`、`status` で絞り込める。長期運用では published 一覧や未公開 validated 一覧から作業対象を選ぶ。
 - publish対象は `acceptance.status=ready` かつ `gate.status=ready` のrevisionのみ。
 - warning承認は公開対象 revision に保存する。ローカルJSON控えだけでは公開証跡として不十分。
 - public URL smoke は保存済みrevisionのhashと取得zipのhashを比較する。
