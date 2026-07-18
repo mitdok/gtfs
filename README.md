@@ -131,4 +131,5 @@ API接続先は `VITE_GTFS_API_BASE_URL`（既定 `http://localhost:8787`）。�
 - 開発方針: [DEV_POLICY.md](http://dc-storage:3000/mit/docs-common/src/branch/main/DEV_POLICY.md)
 - 開発環境・体制: [ENVIRONMENT.md](http://dc-storage:3000/mit/docs-common/src/branch/main/ENVIRONMENT.md)
 - ドキュメント構成規約: [DOC_CONVENTION.md](http://dc-storage:3000/mit/docs-common/src/branch/main/DOC_CONVENTION.md)
+- 命名規約(アプリのバンドルID 等): [CONVENTIONS.md](http://dc-storage:3000/mit/docs-common/src/branch/main/CONVENTIONS.md)
 <!-- docs-common:end -->
