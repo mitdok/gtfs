@@ -117,3 +117,12 @@ API接続先は `VITE_GTFS_API_BASE_URL`（既定 `http://localhost:8787`）。�
 
 - アプリ本体: Apache-2.0
 - 生成データの推奨ライセンス: CC BY
+
+<!-- docs-common:begin -->
+## 共通開発ドキュメント
+
+開発方針・サーバ環境など全プロジェクト共通の事項は [mit/docs-common](http://dc-storage:3000/mit/docs-common) で集中管理。
+- 開発方針: [DEV_POLICY.md](http://dc-storage:3000/mit/docs-common/src/branch/main/DEV_POLICY.md)
+- 開発環境・体制: [ENVIRONMENT.md](http://dc-storage:3000/mit/docs-common/src/branch/main/ENVIRONMENT.md)
+- ドキュメント構成規約: [DOC_CONVENTION.md](http://dc-storage:3000/mit/docs-common/src/branch/main/DOC_CONVENTION.md)
+<!-- docs-common:end -->
