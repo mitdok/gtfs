@@ -118,6 +118,12 @@ API接続先は `VITE_GTFS_API_BASE_URL`（既定 `http://localhost:8787`）。�
 - アプリ本体: Apache-2.0
 - 生成データの推奨ライセンス: CC BY
 
+<!-- project-dashboard:begin -->
+## プロジェクトダッシュボード
+
+このリポジトリの状態（本質・達成度・次アクション）は [project-dashboard](http://dc-storage:3000/mit/project-dashboard) に集約しています。詳細と実装の起点は [DASHBOARD.md](DASHBOARD.md) を参照してください（暫定評価: **MVP実装中 / 達成度 45%**）。
+<!-- project-dashboard:end -->
+
 <!-- docs-common:begin -->
 ## 共通開発ドキュメント
 
