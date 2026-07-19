@@ -1,0 +1,37 @@
+{
+  "$schema": "project-dashboard/.repo-status.schema",
+  "title": "GTFS Studio（西沢ツールWEB版）",
+  "essence": "GTFS-JP/RTの公開オープンデータを取込・編集・検証・配信するWebサービス。OSS＋コミュニティ。SaaSと自治体オンプレ両対応。",
+  "doneMeans": "自治体・事業者がGTFS作成〜検証〜公開を本サービスで完結できる状態",
+  "category": "service",
+  "stack": "TypeScript / React / MapLibre / node:http(依存ゼロAPI)",
+  "phase": "MVP実装中",
+  "milestones": [
+    {
+      "label": "仕様(01-11章)・ロードマップ・STATUS対応表",
+      "status": "done"
+    },
+    {
+      "label": "core(取込/検証/移行/出力)",
+      "status": "partial"
+    },
+    {
+      "label": "web(地図編集/ダイヤ/検証/公開ゲート)",
+      "status": "partial"
+    },
+    {
+      "label": "api(仕様ロック/検収)",
+      "status": "partial"
+    },
+    {
+      "label": "公開・配信の一気通貫",
+      "status": "todo"
+    }
+  ],
+  "nextSteps": [
+    "STATUS未実装項目の消化",
+    "検証→公開ゲートの完成",
+    "コミュニティ配布形態の整備"
+  ],
+  "completionOverride": null
+}
