@@ -65,7 +65,10 @@ pnpm install
 pnpm --filter @gtfs-studio/core build
 VITE_GTFS_API_BASE_URL=https://dokasen.com/gtfs2-api \
   pnpm --filter @gtfs-studio/web exec vite build --base=/gtfs2/
-rsync -av --delete packages/web/dist/ ubuntu@vps-sakura:/var/www/html/gtfs2/
+# 配布zip(dl/)を消さないよう --exclude する。
+rsync -av --delete --exclude 'dl/' packages/web/dist/ ubuntu@vps-sakura:/var/www/html/gtfs2/
+# ※ vite build は index.html を再生成するため、下記「ダウンロード配布物」の
+#   ダウンロードリンク(<a>要素)は再デプロイのたびに index.html へ再注入する。
 
 # --- API（/var/www/gtfs-api/） ---
 pnpm --filter @gtfs-studio/api build
@@ -79,6 +82,25 @@ ssh ubuntu@vps-sakura 'export XDG_RUNTIME_DIR=/run/user/1000; systemctl --user r
 > 注: リポジトリの vite `base` は `/gtfs/`（旧デモ用）。`/gtfs2/` はビルド時に
 > `--base=/gtfs2/` で上書きする。API接続先も `VITE_GTFS_API_BASE_URL` で上書きする。
 > どちらもデプロイ固有の値で、ソースには焼き込まない。
+
+## ダウンロード配布物（ソースzip）
+
+各サイトは、その版のソース一式zipを `dl/` 配下で配布する（サイト上に固定リンクを掲示）。
+
+| サイト | 版 | 配布URL |
+|--------|----|---------|
+| `/gtfs2/`（新） | master（例 `cd53591`） | `https://dokasen.com/gtfs2/dl/gtfs-studio-src-gtfs2-<sha>.zip` |
+| `/gtfs/`（旧） | `57f64ab` | `https://dokasen.com/gtfs/dl/gtfs-studio-src-gtfs-57f64ab.zip` |
+
+- 生成は `git archive`（**追跡ファイルのみ**、`.git`/`.env`/`data`/`node_modules`/ビルド成果物・トークンを含まない）:
+  ```sh
+  git archive --format=zip --prefix=gtfs-studio/ <ref> -o gtfs-studio-src-<label>.zip
+  ```
+- 秘密情報が無いことを、ファイル名（`.env`/`data`/`token`）と実トークン値の両面で検査してから配置する。
+- `dl/` は静的配信のみ。`/gtfs2/dl/` は web 再デプロイの `rsync --delete` 対象内なので、上記の
+  `--exclude 'dl/'` で保護する。`/gtfs/` は再デプロイ対象外なので保護不要。
+- サイト上のダウンロードリンクは、`index.html` の `</body>` 直前に固定表示の `<a href="dl/....zip" download>`
+  を1つ置く（`#root` の外なのでSPAに消されない）。新サイトは再ビルドで index.html が再生成されるため再注入する。
 
 ## nginx（公開経路）
 
