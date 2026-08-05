@@ -42,6 +42,9 @@ pnpm -r test       # 全パッケージテスト
 
 ## Web公開とdashboard連携
 
+- **公開デモ（vps-sakura）**: フロント `https://dokasen.com/gtfs2/` ＋ API `https://dokasen.com/gtfs2-api/`。
+  master最新ビルドの暫定公開。構成・再デプロイ手順・**セキュリティ上の既知の注記（仮実装）** は
+  [`docs/DEPLOY_PUBLIC.md`](./docs/DEPLOY_PUBLIC.md) を参照。
 - 作業ハブ: `http://dc-storage/project/hdd20tb/project-gtfs/`
 - GTFS current: `http://dc-storage/project/hdd20tb/project-gtfs/public/current/`
 - dashboard登録: `/mnt/hdd20tb/project-dashboard/assets/app.js` の `project-gtfs` inventory

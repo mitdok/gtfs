@@ -137,4 +137,5 @@ curl http://localhost:8787/projects/demo/audit \
 - warning承認は公開対象 revision に保存する。ローカルJSON控えだけでは公開証跡として不十分。
 - public URL smoke は保存済みrevisionのhashと取得zipのhashを比較する。
 - token設定時、revision作成、publish、public URL smoke、warning承認、audit取得は token が必要。
+- ⚠ 一方で `PUT /spec-locks/:id`・`POST /acceptance`・RT系の書込/計算（`/rt/alerts`・`/rt/vehicles`・`/rt/trip-updates`・`/rt/sources` のCRUD/poll、compat/evaluate/smoke）は **token非要求**。特に `PUT /rt/sources/:id`＋`POST /rt/sources/:id/poll` は任意URLをサーバに取得させる **SSRF** 面を持つ。公開運用に上げる前に塞ぐこと（塞ぎ方は [`DEPLOY_PUBLIC.md`](./DEPLOY_PUBLIC.md) の「セキュリティ上の既知の注記」参照）。
 - ファイル永続化MVPでは、`data/` のバックアップと権限管理は運用側で行う。
