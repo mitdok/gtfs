@@ -1,6 +1,6 @@
 # GTFS Studio 全体ロードマップ
 
-最終更新: 2026-07-01
+最終更新: 2026-08-10
 
 本書は GTFS Studio の全体進捗、優先順位、未確定事項をまとめる上位ロードマップである。
 詳細な達成管理は以下に分ける。
@@ -13,11 +13,11 @@
 
 | 領域 | 現在地 | 主な実装済み | 残り |
 |------|--------|--------------|------|
-| GTFS-JP v4 core | 約88% | import/export、v3→v4移行、v4検証、公開ゲート、検収判定、golden標準validator回帰、CI定義、実データ回帰CLI/manifest/匿名化CLI、revision/publish/public URL smoke/token認証/監査ログ API MVP | 実データ候補の最終選定/許諾レビュー、DB永続化 |
+| GTFS-JP v4 core | 93% | import/export、v3→v4移行、v4/Google/標準validatorのGolden zip往復CI、検収判定、revision/publish/public URL smoke、token認証/監査ログ | v4/v3実データの最終選定・許諾レビューとA-07/A-08 |
 | Web編集 | MVP完了 | ZIP取込、新規作成、API revision/latest再読込、停留所/路線/便追加、停留所削除/並べ替え、路線属性詳細、shape編集（表操作＋地図ドラッグ）、運賃詳細、検証、公開ゲート表示、warning承認記録API保存、revision/publish/smoke UI MVP | 公開ワークフローの実運用導線 |
 | API | MVP完了 | spec lockファイル永続化、HTTP検収、revision/publish、public URL smoke、token認証、監査ログ、RT Alerts/Vehicles/TripUpdates配信 | DB永続化、本格RBAC |
 | GTFS-RT | 約94% / Beta手前 | ServiceAlerts、RT中継＋source運用UI、VehiclePositions地図デバッグ、TripUpdates core/API MVP、trip候補・block_id/GPS絞り込み・進捗推定、車両位置連動MVP、候補評価JSON/CSV入力/結果表示/出力、鮮度SLO表示、stale policy、監査ログMVP、公開URL smoke、静的GTFS参照ID照合API/Web、source revision照合/activeFrom予約MVP | 実データ評価 |
-| 運用品質 | 未完 | CLI検収、内部テスト、ロードマップ管理 | CI、公開URL smoke、監査ログ、実運用手順 |
+| 運用品質 | MVP完了 | CLI検収、CI成功、自動デプロイ、公開URL smoke、監査ログ、運用手順 | 実データ検収と継続運用証跡 |
 
 ## 2. 次の優先順位
 
@@ -26,7 +26,7 @@
 | ID | 作業 | 完了条件 | 関連 |
 |----|------|----------|------|
 | P0-1 | v4 golden sampleを標準validatorで検証 | minimal / overnight / calendar_dates / translations / shape の validator error 0 を証跡化 | ✅ V4-4 |
-| P0-2 | validator実行をCIまたは定型コマンド化 | `pnpm` から検収が再現でき、失敗時にログが残る | ✅ GitHub Actions定義追加 / runner実績待ち |
+| P0-2 | validator実行をCIまたは定型コマンド化 | `pnpm` から検収が再現でき、失敗時にログが残る | ✅ GitHub Actions成功＋検証artifact保存 |
 | P0-3 | 実データまたは匿名化データの回帰セットを固定 | 取込→再出力→検証を継続実行できる | ⏳ V4-4 CLI/manifest/匿名化CLI追加 / データ未固定 |
 
 ### P1: 公開ワークフローを形にする
