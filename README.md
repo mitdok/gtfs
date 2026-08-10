@@ -36,27 +36,34 @@ pnpm -r test       # 全パッケージテスト
 ## プロジェクトの進め方
 
 - 作業中に得た知見、違和感、設計判断、運用上の注意は、適時このREADMEや `docs/` 配下のMDファイルへ追記する。
-- プログラムや生成処理を更新した場合は、検証内容を記録し、Giteaの該当リポジトリへcommit/pushする。
+- プログラムや生成処理を更新した場合は、検証内容と関連ドキュメントをPull Requestに含める。
 - ロードマップ、TODO、進捗メモを意識し、実装内容に合わせて更新する。
 - 大きな変更は一度にまとめず、調査、設計メモ、最小実装、検証、記録、pushの順に段階を踏んで進める。
+
+## GitHubでの開発
+
+- 正本リポジトリ: [github.com/mitdok/gtfs](https://github.com/mitdok/gtfs)
+- `main` から作業ブランチを作り、Pull RequestとGitHub Actionsを通して変更する。
+- Issueで目的と完了条件を共有し、Pull Requestでは実装・検証・ドキュメントを対応づける。
+- 詳細は [`CONTRIBUTING.md`](./CONTRIBUTING.md) を参照。
 
 ## Web公開とdashboard連携
 
 - **公開デモ（vps-sakura）**: フロント `https://dokasen.com/gtfs2/` ＋ API `https://dokasen.com/gtfs2-api/`。
-  master最新ビルドの暫定公開。構成・再デプロイ手順・**セキュリティ上の既知の注記（仮実装）** は
+  main最新ビルドの暫定公開。構成・再デプロイ手順・**セキュリティ上の既知の注記（仮実装）** は
   [`docs/DEPLOY_PUBLIC.md`](./docs/DEPLOY_PUBLIC.md) を参照。
 - 作業ハブ: `http://dc-storage/project/hdd20tb/project-gtfs/`
 - GTFS current: `http://dc-storage/project/hdd20tb/project-gtfs/public/current/`
 - dashboard登録: `/mnt/hdd20tb/project-dashboard/assets/app.js` の `project-gtfs` inventory
 
-Web公開物は作業ハブ側の `project-gtfs/public/current/` に集約し、実体の開発とGitea管理はこのリポジトリ `/mnt/hdd20tb/project/gtfs` を正本とする。
+Web公開物は作業ハブ側の `project-gtfs/public/current/` に集約し、ソースコードと開発履歴はGitHubリポジトリを正本とする。
 新しい公開ビルド、validator report viewer、運用画面を追加した場合は、このREADME、`/mnt/hdd20tb/project-gtfs/README.md`、`project-dashboard/assets/app.js` を合わせて更新し、dashboardから辿れる状態にする。
 
-## 作業ログ必須運用
+## サーバ内作業ログ
 
-- 作業開始時は `/mnt/hdd20tb/tools/project-log -p project-gtfs -c start --status started --prompt "<受けた指示>" "<作業開始内容>"` で、受けた指示プロンプトと対象を必ず記録する。
+- `dc-storage` 上で運用作業を行う場合は、開始時に `/mnt/hdd20tb/tools/project-log -p project-gtfs -c start --status started --prompt "<受けた指示>" "<作業開始内容>"` で対象を記録する。
 - 作業中は判断、知見、違和感、検証結果を `progress`、`verification`、`push` などのcategoryで適時記録する。
-- 作業終了時は `-c end --status complete|partial|blocked` で、実施内容、検証、commit/push、残件、次に見る場所を必ず記録する。
+- サーバ内作業の終了時は `-c end --status complete|partial|blocked` で、実施内容、検証、commit/push、残件、次に見る場所を記録する。
 - ログは `/mnt/hdd20tb/project.log` と `/mnt/hdd20tb/project-events.jsonl` に保存され、次の作業者は最後の `end` ログから再開する。
 
 ### 検収・標準validator

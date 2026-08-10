@@ -1,0 +1,32 @@
+name: Bug report
+description: 不具合を報告する
+title: "bug: "
+labels: [bug]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: 概要
+      description: 発生した問題を簡潔に説明してください。
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現手順
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待する動作
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 実行環境
+      description: OS、ブラウザ、Node.js、入力フィードなどを記載してください。機密情報は含めないでください。

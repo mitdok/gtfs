@@ -26,7 +26,7 @@
 | ID | 作業 | 完了条件 | 関連 |
 |----|------|----------|------|
 | P0-1 | v4 golden sampleを標準validatorで検証 | minimal / overnight / calendar_dates / translations / shape の validator error 0 を証跡化 | ✅ V4-4 |
-| P0-2 | validator実行をCIまたは定型コマンド化 | `pnpm` から検収が再現でき、失敗時にログが残る | ✅ Gitea Actions定義追加 / runner実績待ち |
+| P0-2 | validator実行をCIまたは定型コマンド化 | `pnpm` から検収が再現でき、失敗時にログが残る | ✅ GitHub Actions定義追加 / runner実績待ち |
 | P0-3 | 実データまたは匿名化データの回帰セットを固定 | 取込→再出力→検証を継続実行できる | ⏳ V4-4 CLI/manifest/匿名化CLI追加 / データ未固定 |
 
 ### P1: 公開ワークフローを形にする
@@ -61,7 +61,7 @@
 |------|--------------|------------|
 | MobilityData Validatorの実行環境 | P0-1 / P0-2 / P1-3 | validator jarの配置、Javaバージョン、CIでの実行可否 |
 | 実データ利用許諾 | P0-3 / P2-3 | 公開可能な実フィードか、匿名化してrepoに入れるか |
-| 公開URLの置き場所 | P1-2 / P1-3 / RT-5 | Gitea Pages相当、既存Webサーバ、別ホストのどれにするか |
+| 公開URLの置き場所 | P1-2 / P1-3 / RT-5 | GitHub Pages、既存Webサーバ、別ホストのどれにするか |
 | 永続化方式 | P1-1 / API認証 / 監査ログ | ファイル継続かDB化するか |
 | RT入力ソース | P2-2 / P2-3 / P2-4 | GPS JSON、既存GTFS-RT中継、手動入力のどれを主にするか |
 

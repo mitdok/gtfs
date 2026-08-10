@@ -2,7 +2,7 @@
 
 最終更新: 2026-08-05
 
-master の最新ビルドを、公開VPS `vps-sakura`（`dokasen.com`）へ **`/gtfs2/`（フロント）＋
+main の最新ビルドを、公開VPS `vps-sakura`（`dokasen.com`）へ **`/gtfs2/`（フロント）＋
 `/gtfs2-api/`（API）** として公開している。旧 `/gtfs/` は別の（古い）ビルドが並存する
 デモで、本デプロイとは独立。
 
@@ -57,7 +57,7 @@ VPS標準の Node 18 は本コードの JSON import attributes（`import ... wit
 
 ## ビルド＆再デプロイ
 
-ローカル（`~/gtfs`, master）でビルドして rsync する。
+ローカル（`~/gtfs`, main）でビルドして rsync する。
 
 ```sh
 # --- フロント（/gtfs2/, API接続先を本番に固定してビルド） ---
@@ -89,7 +89,7 @@ ssh ubuntu@vps-sakura 'export XDG_RUNTIME_DIR=/run/user/1000; systemctl --user r
 
 | サイト | 版 | 配布URL |
 |--------|----|---------|
-| `/gtfs2/`（新） | master（例 `cd53591`） | `https://dokasen.com/gtfs2/dl/gtfs-studio-src-gtfs2-<sha>.zip` |
+| `/gtfs2/`（新） | main（例 `cd53591`） | `https://dokasen.com/gtfs2/dl/gtfs-studio-src-gtfs2-<sha>.zip` |
 | `/gtfs/`（旧） | `57f64ab` | `https://dokasen.com/gtfs/dl/gtfs-studio-src-gtfs-57f64ab.zip` |
 
 - 生成は `git archive`（**追跡ファイルのみ**、`.git`/`.env`/`data`/`node_modules`/ビルド成果物・トークンを含まない）:

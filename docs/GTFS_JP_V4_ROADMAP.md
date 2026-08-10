@@ -20,7 +20,7 @@
 | v4出力・プロファイルフィルタ | 10 | 8 | ✅ MVP / 公開URL検証不足 | `exporter.ts`, `export-profile.ts` |
 | v4検証ルール | 18 | 16 | ✅ 中核 / 均一運賃以外の詳細・実データ精査不足 | `validator.ts` |
 | Google公開ゲート・公開可否判定 | 10 | 8 | ✅ 判定器＋Web表示 / 運用証跡不足 | `release-gate.ts`, `ReleaseGateView.tsx` |
-| 標準validator連携 | 10 | 8 | ✅ report取込＋CLI Java起動＋CI定義 / runner実績待ち | `standard-validator.ts`, `gtfs-acceptance.mjs`, `.gitea/workflows/ci.yml` |
+| 標準validator連携 | 10 | 8 | ✅ report取込＋CLI Java起動＋CI定義 / runner実績待ち | `standard-validator.ts`, `gtfs-acceptance.mjs`, `.github/workflows/ci.yml` |
 | golden sample・実データ検収 | 10 | 9 | ⏳ golden標準validator error 0完了 / 実データ回帰CLI・manifest・匿名化CLI・検収CLI連携追加 / 実データ未固定 | `acceptance.ts`, `v4-golden-samples.ts`, `gtfs-validate-golden.mjs`, `gtfs-regression.mjs`, `gtfs-anonymize.mjs` |
 | Web編集・出力ワークフロー | 7 | 7 | ✅ 新規作成＋路線/停留所/便追加MVP / 公開ワークフロー未完 | `packages/web` |
 | API・永続化・公開URL運用 | 5 | 5 | ✅ API＋ファイル永続化＋revision/publish＋public URL smoke＋token認証/監査ログMVP | `packages/api` |
@@ -86,7 +86,7 @@
 | V4-3-1 | report.json取込 | MobilityData validator結果を集計できる | ✅ |
 | V4-3-2 | validator lock生成 | validator名・版をlock化できる | ✅ |
 | V4-3-3 | Java validator実行ラッパ | zipを渡してreport.jsonを生成できる | ✅ CLI |
-| V4-3-4 | CI/ローカルコマンド | `pnpm gtfs:validate` 相当で実行できる | ✅ Gitea Actions定義追加 / runner実績待ち |
+| V4-3-4 | CI/ローカルコマンド | `pnpm gtfs:validate` 相当で実行できる | ✅ GitHub Actions定義追加 / runner実績待ち |
 | V4-3-5 | Web validator結果取込 | report.jsonをUIから取り込み公開ゲートへ反映 | ✅ MVP |
 
 ### V4-4 golden sample・実データ回帰
