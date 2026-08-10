@@ -73,6 +73,50 @@ describe("GTFS Studio API", () => {
     expect((await r.json()).status).toBe("ok");
   });
 
+  it("static write token設定時は全非GET APIを一律認証する", async () => {
+    const authDir = mkdtempSync(join(tmpdir(), "gtfs-api-global-auth-"));
+    const repository = openSpecLockRepository(join(authDir, "spec-locks.json"));
+    const authServer = createApiServer({ repository, staticWriteTokens: ["admin-token"] });
+    const authBase = await listen(authServer);
+    try {
+      const cases: Array<{ path: string; method: string; body?: unknown }> = [
+        {
+          path: "/spec-locks/VALIDATOR_LOCK",
+          method: "PUT",
+          body: { status: "locked", version: "8.0.1", label: "MobilityData" },
+        },
+        { path: "/acceptance", method: "POST", body: {} },
+        { path: "/rt/sources/untrusted", method: "PUT", body: { url: "http://127.0.0.1/private" } },
+        { path: "/rt/sources/untrusted/poll", method: "POST" },
+        { path: "/rt/alerts", method: "POST", body: {} },
+        { path: "/rt/static-compat/check", method: "POST", body: {} },
+      ];
+
+      for (const testCase of cases) {
+        const rejected = await fetch(`${authBase}${testCase.path}`, {
+          method: testCase.method,
+          headers: testCase.body ? { "content-type": "application/json" } : undefined,
+          body: testCase.body ? JSON.stringify(testCase.body) : undefined,
+        });
+        expect(rejected.status, `${testCase.method} ${testCase.path}`).toBe(401);
+      }
+
+      const accepted = await fetch(`${authBase}/spec-locks/VALIDATOR_LOCK`, {
+        method: "PUT",
+        headers: { "content-type": "application/json", authorization: "Bearer admin-token" },
+        body: JSON.stringify({ status: "locked", version: "8.0.1", label: "MobilityData" }),
+      });
+      expect(accepted.status).toBe(200);
+
+      const anonymousRead = await fetch(`${authBase}/spec-locks/VALIDATOR_LOCK`);
+      expect(anonymousRead.status).toBe(200);
+      expect((await anonymousRead.json()).status).toBe("locked");
+    } finally {
+      await new Promise<void>((resolve) => authServer.close(() => resolve()));
+      rmSync(authDir, { recursive: true, force: true });
+    }
+  });
+
   it("GET /spec-locks は既定ロック一覧を返す", async () => {
     const r = await fetch(`${base}/spec-locks`);
     const body = await r.json();

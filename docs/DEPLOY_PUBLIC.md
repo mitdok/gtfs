@@ -120,31 +120,17 @@ location /gtfs2-api/ {
 }
 ```
 
-## セキュリティ上の既知の注記（⚠ 仮実装ゆえ未対応）
+## API書込保護
 
-現状、API はインターネットから到達可能で、**一部の書込/計算エンドポイントが
-トークン非要求**のまま公開されている。恒久運用へ上げる前に塞ぐこと。
+`GTFS_API_TOKENS` が設定された環境では、APIは `GET` / `OPTIONS` 以外の全リクエストに
+`Authorization: Bearer <token>` または `x-api-token` を要求する。個別ルートで認証を
+追加し忘れてもグローバル書込ゲートで拒否される。
 
-- **token必須（保護済み）**: revision作成 / publish / public-url-smoke / warning承認 / audit取得
-  （`authorizeStaticWrite`）。
-- **token非要求（=誰でも実行可能・要対応）**:
-  - `PUT /spec-locks/:id` — 仕様ロックの上書き（メタデータ改変）
-  - `POST /acceptance`、`POST /rt/static-compat/check`、`POST /rt/trip-matching/evaluate`,
-    `POST /rt/smoke` — アップロード zip に対するサーバ側計算（計算DoSの余地。nginx 64mで上限）
-  - `POST/PUT/DELETE /rt/alerts`・`/rt/vehicles`・`/rt/trip-updates`（および `/:id`） — RTストアの書換
-    （※ `/rt/vehicles` 系は `rtVehicleTokens` 設定時のみ保護されるが、本デプロイでは未設定＝開放）
-  - **`PUT /rt/sources/:id` ＋ `POST /rt/sources/:id/poll` — ⚠ SSRF**:
-    任意URLのソースを登録し、サーバにそのURLを取得させられる。公開状態では
-    内部サービス（`127.0.0.1:8010` 等）への探査に悪用され得る。**最優先で塞ぐべき項目。**
-
-### 想定する塞ぎ方（未実装）
-
-- 最短・堅牢: リクエストハンドラ先頭で **GET/OPTIONS以外は一律 `authorizeStaticWrite` を要求**
-  （グローバル書込ゲート）。併せて Web の RT系コンポーネント
-  （`RealtimeAlertsView` / `RealtimeSourcesView` / `RealtimeVehiclesView` / `RealtimeSmokeView` /
-  `RealtimeStaticCompatView`）が現在 `Authorization` を付けていないので、token を配線する。
-  匿名利用は client-side studio（取込/編集/検証/再出力）＋ read-only 閲覧に限定される。
-- 代替: SSRFのある `rtRelay`（外部poll）だけを無効化し、他は段階的に token 化。
+- 保護対象: 仕様ロック更新、検収、revision、publish、smoke、warning承認、GTFS-RTの
+  Alerts/Vehicles/TripUpdates更新、source登録・poll、静的互換性・trip matching評価。
+- source登録・pollを匿名実行できないため、任意URL取得によるSSRF経路も閉じる。
+- WebのGTFS-RT画面にはtoken入力欄があり、入力値をタブのセッション内だけに保存してAPI要求へ付与する。
+- `GTFS_API_TOKENS` が空の開発環境では従来どおり認証を無効化できる。本番では必ず設定する。
 
 > 現状の主要デモ（取込→編集→検証→再出力）は **すべてブラウザ内（client-side）で完結**し、
 > API書込を伴わないため、上記の塞ぎ込みを入れても匿名ユーザーの基本操作は損なわれない。
