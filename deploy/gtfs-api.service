@@ -1,0 +1,18 @@
+[Unit]
+Description=GTFS Studio API (node:http, localhost only)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/gtfs-api
+Environment=GTFS_API_HOST=127.0.0.1
+Environment=PORT=8787
+Environment=GTFS_SPEC_LOCKS_PATH=/var/www/gtfs-api/data/spec-locks.json
+Environment=GTFS_REVISIONS_PATH=/var/www/gtfs-api/data/revisions
+EnvironmentFile=/var/www/gtfs-api/.env
+ExecStart=/home/ubuntu/opt/node22/bin/node /var/www/gtfs-api/start.mjs
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

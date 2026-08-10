@@ -1,0 +1,15 @@
+[Unit]
+Description=GitHub Actions Runner (mitdok/gtfs production)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ubuntu/actions-runner-gtfs
+ExecStart=/home/ubuntu/actions-runner-gtfs/run.sh
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+
+[Install]
+WantedBy=default.target

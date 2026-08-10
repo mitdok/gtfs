@@ -1,0 +1,9 @@
+{
+  "name": "gtfs-api-deploy",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "fflate": "0.8.3",
+    "gtfs-realtime-bindings": "2.2.0"
+  }
+}
