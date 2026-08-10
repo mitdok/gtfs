@@ -282,6 +282,25 @@ export function createApiServer(options: ApiOptions): Server {
       return sendJson(res, 200, { status: "ok", service: "gtfs-studio-api" });
     }
 
+    // 公開APIでは参照系だけを匿名利用に限定する。staticWriteTokens が設定されている
+    // 環境では、個別ルートの実装漏れにかかわらず全変更・計算要求を一律で保護する。
+    if (method !== "GET") {
+      const auth = authorizeStaticWrite(req);
+      if (!auth.ok) {
+        const projectMatch = path.match(/^\/projects\/([^/]+)/);
+        if (projectMatch) {
+          const projectId = decodeURIComponent(projectMatch[1]!);
+          const revisionMatch = path.match(/^\/projects\/[^/]+\/revisions\/([^/:]+)/);
+          const targetId = revisionMatch ? decodeURIComponent(revisionMatch[1]!) : projectId;
+          recordStaticAudit(projectId, "revision.auth_failed", revisionMatch ? "revision" : "project", targetId, "blocked", {
+            method,
+            path,
+          });
+        }
+        return sendJson(res, auth.status, { error: auth.error });
+      }
+    }
+
     if (path === "/spec-locks") {
       if (method === "GET") return sendJson(res, 200, { specLocks: repository.list() });
       return sendJson(res, 405, { error: "method not allowed" });
