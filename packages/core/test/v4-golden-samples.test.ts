@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { strToU8 } from "fflate";
-import { exportToFiles } from "../src/exporter.js";
-import { importEntries } from "../src/importer.js";
+import { exportToFiles, exportToZip } from "../src/exporter.js";
+import { importEntries, importGtfsZip } from "../src/importer.js";
 import { validateFeed } from "../src/validator.js";
 import { v4GoldenSamples, v4MinimalFixedBusFiles } from "../src/v4-golden-samples.js";
 
@@ -49,5 +49,18 @@ describe("GTFS-JP v4 golden samples", () => {
   it("v4 golden feed は出力後も v4 error 0 を維持する", () => {
     const exported = exportToFiles(feedFrom(V4_GOLDEN_FILES), { profileId: "gtfs-jp-v4" });
     expect(validateV4(exported).summary.errors).toBe(0);
+  });
+
+  it.each(v4GoldenSamples())("$id はzip往復後もv4/Google error 0を維持する", (sample) => {
+    const zip = exportToZip(feedFrom(sample.files), { profileId: "gtfs-jp-v4" });
+    const roundtripped = importGtfsZip(zip).feed;
+
+    expect(validateFeed(roundtripped, { profileId: "gtfs-jp-v4" }).summary.errors).toBe(0);
+    expect(
+      validateFeed(roundtripped, {
+        profileId: "google-transit-ready",
+        validationDate: "20260616",
+      }).summary.errors,
+    ).toBe(0);
   });
 });

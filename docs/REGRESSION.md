@@ -1,6 +1,6 @@
 # 実データ回帰セット
 
-最終更新: 2026-07-01
+最終更新: 2026-08-10
 
 GTFS-JP v4 の A-07/A-08 検収では、golden sample だけでなく実フィードまたは匿名化フィードの
 取込、再出力、標準validator結果を証跡化する。
@@ -110,6 +110,8 @@ Web公開ゲートで使う場合:
 - `--regression-summary` は `mode=roundtrip` を A-07、`mode=v3-migration` を A-08 に対応させる。roundtrip だけの summary では A-08 は fail のままなので、リリース検収用 manifest には両方が必要。
 
 ## 残課題
+
+2026-08-10時点で、コード・CLI・CI側の準備は完了している。以下は実データ所有者の許諾とレビュー主体を決めない限り機械的には完了できない項目である。
 
 - 実データを repo に入れてよいか、または匿名化して入れるかの判断が未確定。
 - `gtfs-tmp/regression/manifest.json` に登録する実フィード候補が未確定。

@@ -1,6 +1,6 @@
 # GTFS-JP v4対応ロードマップ・達成管理
 
-最終更新: 2026-07-01
+最終更新: 2026-08-10
 
 本書はGTFS StudioのGTFS-JP v4対応を、実装・検証・公開運用の観点で段階管理する。対象は固定路線バスの静的GTFS-JP v4 MVPであり、GTFS-RT、GTFS-Flex、Fares v2は別フェーズとして扱う。
 
@@ -8,28 +8,28 @@
 
 ## 1. 現在地
 
-総合進捗: **88%**
+総合進捗: **93%**
 
 内訳:
 
 | 領域 | 重み | 現在点 | 状態 | 根拠 |
 |------|------|--------|------|------|
-| 仕様ロック・プロファイル定義 | 10 | 8 | ✅ core完了 / API永続化未完 | `src/profiles/*.json`, `spec-lock.ts` |
+| 仕様ロック・プロファイル定義 | 10 | 10 | ✅ core・API永続化完了 | `src/profiles/*.json`, `spec-lock.ts`, `/spec-locks` |
 | 取込・文字コード・ラウンドトリップ | 10 | 10 | ✅ | `importer.ts`, `encoding.ts`, roundtrip tests |
 | v3→v4移行 | 10 | 8 | ✅ MVP / 実フィード回帰不足 | `migration.ts` |
-| v4出力・プロファイルフィルタ | 10 | 8 | ✅ MVP / 公開URL検証不足 | `exporter.ts`, `export-profile.ts` |
+| v4出力・プロファイルフィルタ | 10 | 10 | ✅ 公開URL smokeまで完了 | `exporter.ts`, `export-profile.ts`, public URL smoke API |
 | v4検証ルール | 18 | 16 | ✅ 中核 / 均一運賃以外の詳細・実データ精査不足 | `validator.ts` |
-| Google公開ゲート・公開可否判定 | 10 | 8 | ✅ 判定器＋Web表示 / 運用証跡不足 | `release-gate.ts`, `ReleaseGateView.tsx` |
-| 標準validator連携 | 10 | 8 | ✅ report取込＋CLI Java起動＋CI定義 / runner実績待ち | `standard-validator.ts`, `gtfs-acceptance.mjs`, `.github/workflows/ci.yml` |
-| golden sample・実データ検収 | 10 | 9 | ⏳ golden標準validator error 0完了 / 実データ回帰CLI・manifest・匿名化CLI・検収CLI連携追加 / 実データ未固定 | `acceptance.ts`, `v4-golden-samples.ts`, `gtfs-validate-golden.mjs`, `gtfs-regression.mjs`, `gtfs-anonymize.mjs` |
+| Google公開ゲート・公開可否判定 | 10 | 9 | ✅ 判定器＋Web表示＋warning承認保存 / 実データを使った運用証跡待ち | `release-gate.ts`, `ReleaseGateView.tsx` |
+| 標準validator連携 | 10 | 10 | ✅ report取込＋CLI Java起動＋CI成功実績 | `standard-validator.ts`, `gtfs-acceptance.mjs`, `.github/workflows/ci.yml` |
+| golden sample・実データ検収 | 10 | 8 | ⏳ golden 3系統検証とCI証跡化完了 / 実データ未固定 | `acceptance.ts`, `v4-golden-samples.ts`, `gtfs-validate-golden.mjs`, `gtfs-regression.mjs` |
 | Web編集・出力ワークフロー | 7 | 7 | ✅ 新規作成＋路線/停留所/便追加MVP / 公開ワークフロー未完 | `packages/web` |
 | API・永続化・公開URL運用 | 5 | 5 | ✅ API＋ファイル永続化＋revision/publish＋public URL smoke＋token認証/監査ログMVP | `packages/api` |
-| **合計** | **100** | **88** |  |  |
+| **合計** | **100** | **93** |  |  |
 
 読み替え:
 
-- **coreライブラリとしてのv4対応**: 約83%。取込、移行、検証、出力、公開判定、golden標準validator回帰とCI定義の主要部は動く。
-- **実務公開できるプロダクトとしてのv4対応**: 約81〜82%。CI runner実績、実データ候補の最終選定/許諾レビュー、DB永続化が残る。
+- **coreライブラリとしてのv4対応**: 固定路線バス静的MVPの主要機能は完了。Golden 5件はzip往復後にGTFS-JP v4、Google、MobilityData validator 8.0.1のすべてでerror 0。
+- **実務公開できるプロダクトとしてのv4対応**: CI・自動デプロイ・revision/publish・公開URL smoke・認証/監査まで動作済み。100%判定にはレビュー済み実データによるA-07/A-08が必要。
 
 ## 2. フェーズ
 
@@ -86,18 +86,18 @@
 | V4-3-1 | report.json取込 | MobilityData validator結果を集計できる | ✅ |
 | V4-3-2 | validator lock生成 | validator名・版をlock化できる | ✅ |
 | V4-3-3 | Java validator実行ラッパ | zipを渡してreport.jsonを生成できる | ✅ CLI |
-| V4-3-4 | CI/ローカルコマンド | `pnpm gtfs:validate` 相当で実行できる | ✅ GitHub Actions定義追加 / runner実績待ち |
+| V4-3-4 | CI/ローカルコマンド | `pnpm gtfs:validate` 相当で実行できる | ✅ GitHub Actions成功実績あり |
 | V4-3-5 | Web validator結果取込 | report.jsonをUIから取り込み公開ゲートへ反映 | ✅ MVP |
 
 ### V4-4 golden sample・実データ回帰
 
 | ID | タスク | 受入基準 | 状態 |
 |----|--------|----------|------|
-| V4-4-1 | minimal-fixed-bus | v4 error 0、標準validator error 0 | ✅ validator 8.0.1 error 0 |
-| V4-4-2 | overnight-bus | 24時超時刻を標準validatorで確認 | ✅ validator 8.0.1 error 0 |
-| V4-4-3 | calendar-dates-only | calendarなしでもservice参照が成立 | ✅ validator 8.0.1 error 0 |
-| V4-4-4 | translations-kana | 読み仮名出力を確認 | ✅ validator 8.0.1 error 0 |
-| V4-4-5 | shape-basic | shapes/trips.shape_idを確認 | ✅ validator 8.0.1 error 0 |
+| V4-4-1 | minimal-fixed-bus | v4 error 0、標準validator error 0 | ✅ zip往復後 v4/Google/validator 8.0.1 error 0 |
+| V4-4-2 | overnight-bus | 24時超時刻を標準validatorで確認 | ✅ zip往復後 v4/Google/validator 8.0.1 error 0 |
+| V4-4-3 | calendar-dates-only | calendarなしでもservice参照が成立 | ✅ zip往復後 v4/Google/validator 8.0.1 error 0 |
+| V4-4-4 | translations-kana | 読み仮名出力を確認 | ✅ zip往復後 v4/Google/validator 8.0.1 error 0 |
+| V4-4-5 | shape-basic | shapes/trips.shape_idを確認 | ✅ zip往復後 v4/Google/validator 8.0.1 error 0 |
 | V4-4-6 | legacy-v3-import | v3由来フィードをv4出力へ移行 | ⏳ manifest・匿名化対応済 / データ未固定 |
 | V4-4-7 | real-feed-roundtrip-1 | 実フィード取込→再出力→標準validator error 0 | ⏳ manifest・匿名化対応済 / データ未固定 |
 
@@ -127,11 +127,11 @@
 ## 4. 次の優先順
 
 1. **V4-4 実データ回帰**
-   - 利用許諾のある実フィード、または匿名化フィードを固定する。
-2. **Web編集の実務操作強化**
-   - 公開ワークフローの実運用導線を追加する。
-3. **実データ回帰セット固定**
-   - 利用許諾のある実フィード、または匿名化フィードを固定する。
+   - 利用許諾のあるv4フィードとv3フィードを各1件選び、レビュー済みmanifestへ固定する。
+2. **V4-7 リリース検収**
+   - 固定した2件からA-07/A-08を通し、公開URL smokeを含めA-01〜A-10をreadyにする。
+3. **継続運用証跡**
+   - CIの `gtfs-v4-golden-validation` artifact とrevision監査記録をリリース単位で保管する。
 
 ## 5. 進捗率の更新ルール
 

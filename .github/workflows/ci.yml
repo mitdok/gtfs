@@ -75,3 +75,11 @@ jobs:
 
       - name: Validate golden feeds
         run: pnpm gtfs:validate-golden
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: gtfs-v4-golden-validation
+          path: gtfs-tmp/golden-reports/
+          if-no-files-found: error
