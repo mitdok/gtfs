@@ -11,7 +11,7 @@ import { dirname, resolve } from "node:path";
 import { pipeline } from "node:stream/promises";
 
 const VERSION = "8.0.1";
-const URL = `https://github.com/MobilityData/gtfs-validator/releases/download/v${VERSION}/gtfs-validator-${VERSION}-cli.jar`;
+const DOWNLOAD_URL = `https://github.com/MobilityData/gtfs-validator/releases/download/v${VERSION}/gtfs-validator-${VERSION}-cli.jar`;
 const SHA256 = "19293ddd9b6f954f216d4f12054bd8a3232921751c4484339e339764a91000e2";
 
 function parseArgs(argv) {
@@ -78,8 +78,8 @@ try {
 
   await mkdir(dirname(output), { recursive: true });
   await rm(tmp, { force: true });
-  console.log(`MobilityData validator ${VERSION} を取得します: ${URL}`);
-  await download(URL, tmp);
+  console.log(`MobilityData validator ${VERSION} を取得します: ${DOWNLOAD_URL}`);
+  await download(DOWNLOAD_URL, tmp);
 
   const actual = await sha256(tmp);
   if (actual !== SHA256) {
