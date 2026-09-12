@@ -532,6 +532,7 @@ export function ReleaseGateView({
                   ? "project/revision ID と公開URLが必要です"
                   : undefined
               }
+            >
               smoke
             </button>
           </div>
