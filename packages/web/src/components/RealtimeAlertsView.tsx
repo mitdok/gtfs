@@ -295,7 +295,7 @@ export function RealtimeAlertsView() {
           <label>
             start
             <input
-              placeholder="2026-06-16T09:00:00+09:00"
+              placeholder="YYYY-MM-DDTHH:mm:ss+09:00"
               value={draft.start}
               onChange={(e) => update("start", e.target.value)}
             />
@@ -303,7 +303,7 @@ export function RealtimeAlertsView() {
           <label>
             end
             <input
-              placeholder="2026-06-16T18:00:00+09:00"
+              placeholder="YYYY-MM-DDTHH:mm:ss+09:00"
               value={draft.end}
               onChange={(e) => update("end", e.target.value)}
             />

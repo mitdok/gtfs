@@ -13,7 +13,7 @@ interface DraftStop {
   stopLon: string;
 }
 
-interface Draft {
+export interface Draft {
   feedName: string;
   agencyName: string;
   agencyUrl: string;
@@ -25,23 +25,33 @@ interface Draft {
   stops: DraftStop[];
 }
 
-const DEFAULT_DRAFT: Draft = {
-  feedName: "新規GTFS-JP v4",
-  agencyName: "テスト交通",
-  agencyUrl: "https://example.com",
-  routeLongName: "テスト線",
-  routeShortName: "1",
-  feedStartDate: "20260401",
-  feedEndDate: "20261231",
-  firstDepartureTime: "07:00:00",
-  stops: [
-    { stopName: "駅前", stopNameKana: "エキマエ", stopLat: "34.769100", stopLon: "137.391600" },
-    { stopName: "市役所前", stopNameKana: "シヤクショマエ", stopLat: "34.766000", stopLon: "137.385000" },
-  ],
-};
+function formatGtfsDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}${month}${day}`;
+}
+
+export function createDefaultDraft(now = new Date()): Draft {
+  const end = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
+  return {
+    feedName: "新規GTFS-JP v4",
+    agencyName: "",
+    agencyUrl: "",
+    routeLongName: "",
+    routeShortName: "",
+    feedStartDate: formatGtfsDate(now),
+    feedEndDate: formatGtfsDate(end),
+    firstDepartureTime: "07:00:00",
+    stops: [
+      { stopName: "", stopNameKana: "", stopLat: "", stopLon: "" },
+      { stopName: "", stopNameKana: "", stopLat: "", stopLon: "" },
+    ],
+  };
+}
 
 export function NewFeedView({ onCreate }: Props) {
-  const [draft, setDraft] = useState<Draft>(DEFAULT_DRAFT);
+  const [draft, setDraft] = useState<Draft>(() => createDefaultDraft());
   const [error, setError] = useState<string | null>(null);
 
   const canCreate = useMemo(
@@ -71,7 +81,7 @@ export function NewFeedView({ onCreate }: Props) {
       ...current,
       stops: [
         ...current.stops,
-        { stopName: "", stopNameKana: "", stopLat: "34.760000", stopLon: "137.380000" },
+        { stopName: "", stopNameKana: "", stopLat: "", stopLon: "" },
       ],
     }));
   }, []);
@@ -120,19 +130,36 @@ export function NewFeedView({ onCreate }: Props) {
           </label>
           <label>
             事業者名
-            <input value={draft.agencyName} onChange={(e) => update("agencyName", e.target.value)} />
+            <input
+              value={draft.agencyName}
+              placeholder="○○交通"
+              onChange={(e) => update("agencyName", e.target.value)}
+            />
           </label>
           <label className="wide">
             事業者URL
-            <input value={draft.agencyUrl} onChange={(e) => update("agencyUrl", e.target.value)} />
+            <input
+              type="url"
+              value={draft.agencyUrl}
+              placeholder="https://example.jp"
+              onChange={(e) => update("agencyUrl", e.target.value)}
+            />
           </label>
           <label>
             路線番号
-            <input value={draft.routeShortName} onChange={(e) => update("routeShortName", e.target.value)} />
+            <input
+              value={draft.routeShortName}
+              placeholder="1"
+              onChange={(e) => update("routeShortName", e.target.value)}
+            />
           </label>
           <label>
             路線名
-            <input value={draft.routeLongName} onChange={(e) => update("routeLongName", e.target.value)} />
+            <input
+              value={draft.routeLongName}
+              placeholder="○○線"
+              onChange={(e) => update("routeLongName", e.target.value)}
+            />
           </label>
           <label>
             開始日
@@ -170,22 +197,42 @@ export function NewFeedView({ onCreate }: Props) {
               {draft.stops.map((stop, index) => (
                 <tr key={index}>
                   <td>
-                    <input value={stop.stopName} onChange={(e) => updateStop(index, "stopName", e.target.value)} />
+                    <input
+                      aria-label={`停留所${index + 1} 名称`}
+                      placeholder="○○駅"
+                      value={stop.stopName}
+                      onChange={(e) => updateStop(index, "stopName", e.target.value)}
+                    />
                   </td>
                   <td>
                     <input
                       value={stop.stopNameKana}
+                      aria-label={`停留所${index + 1} 読み`}
                       onChange={(e) => updateStop(index, "stopNameKana", e.target.value)}
                     />
                   </td>
                   <td>
-                    <input value={stop.stopLat} onChange={(e) => updateStop(index, "stopLat", e.target.value)} />
+                    <input
+                      aria-label={`停留所${index + 1} 緯度`}
+                      placeholder="35.681236"
+                      value={stop.stopLat}
+                      onChange={(e) => updateStop(index, "stopLat", e.target.value)}
+                    />
                   </td>
                   <td>
-                    <input value={stop.stopLon} onChange={(e) => updateStop(index, "stopLon", e.target.value)} />
+                    <input
+                      aria-label={`停留所${index + 1} 経度`}
+                      placeholder="139.767125"
+                      value={stop.stopLon}
+                      onChange={(e) => updateStop(index, "stopLon", e.target.value)}
+                    />
                   </td>
                   <td>
-                    <button disabled={draft.stops.length <= 2} onClick={() => removeStop(index)}>
+                    <button
+                      aria-label={`停留所${index + 1}を削除`}
+                      disabled={draft.stops.length <= 2}
+                      onClick={() => removeStop(index)}
+                    >
                       削除
                     </button>
                   </td>

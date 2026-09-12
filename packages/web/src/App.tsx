@@ -14,11 +14,12 @@ import { RealtimeView } from "./components/RealtimeView";
 import { NewFeedView } from "./components/NewFeedView";
 import { FaresView } from "./components/FaresView";
 import { ShapesView } from "./components/ShapesView";
+import { MetadataView } from "./components/MetadataView";
 import { API_BASE, apiJson } from "./lib/api";
 
 /** トップで選ぶ作業モード。`edit` は feed 取込/作成後の編集画面。 */
 type View = "home" | "import" | "new" | "rt" | "edit";
-type EditTab = "stops" | "timetable" | "fares" | "shapes" | "validation" | "release";
+type EditTab = "metadata" | "stops" | "timetable" | "fares" | "shapes" | "validation" | "release";
 type ProfileId = "gtfs-jp-v4" | "google-transit-ready" | "gtfs-base" | "gtfs-jp-v3-legacy";
 type ApiRevisionStatusFilter = "all" | "validated" | "published" | "superseded";
 
@@ -77,6 +78,7 @@ export function App() {
   const [editTab, setEditTab] = useState<EditTab>("stops");
   const [profileId, setProfileId] = useState<ProfileId>("gtfs-jp-v4");
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
+  const [importError, setImportError] = useState("");
   const [apiProjectId, setApiProjectId] = useState("demo");
   const [apiRevisionId, setApiRevisionId] = useState("");
   const [apiToken, setApiToken] = useState("");
@@ -125,10 +127,16 @@ export function App() {
 
   const onFile = useCallback(
     async (file: File) => {
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const { feed, warnings } = importGtfsZip(bytes);
-      setApiRevisionId("");
-      enterEditor(feed, file.name, warnings);
+      try {
+        setImportError("");
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const { feed, warnings } = importGtfsZip(bytes);
+        setApiRevisionId("");
+        enterEditor(feed, file.name, warnings);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setImportError(`ZIPを読み込めませんでした: ${message}`);
+      }
     },
     [enterEditor],
   );
@@ -352,6 +360,11 @@ export function App() {
                   }}
                 />
               </label>
+              {importError && (
+                <div className="rt-error" role="alert">
+                  {importError}
+                </div>
+              )}
               {feed && (
                 <button type="button" onClick={() => setView("edit")}>
                   読み込み済みデータを編集
@@ -555,6 +568,9 @@ export function App() {
       {inEditor && (
         <>
           <nav className="tabs">
+            <button className={editTab === "metadata" ? "active" : ""} onClick={() => setEditTab("metadata")}>
+              基本情報
+            </button>
             <button className={editTab === "stops" ? "active" : ""} onClick={() => setEditTab("stops")}>
               停留所
             </button>
@@ -575,6 +591,9 @@ export function App() {
             </button>
           </nav>
           <main className="main">
+            {editTab === "metadata" && (
+              <MetadataView feed={feed} version={version} mutateFeed={mutateFeed} />
+            )}
             {editTab === "stops" && <StopsView feed={feed} version={version} mutateFeed={mutateFeed} />}
             {editTab === "timetable" && (
               <TimetableView feed={feed} version={version} mutateFeed={mutateFeed} />

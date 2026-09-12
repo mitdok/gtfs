@@ -337,6 +337,12 @@ tr.warning td:first-child { color: #b07d10; font-weight: 600; }
   margin-top: 16px; padding-top: 12px; border-top: 1px solid #eee;
 }
 
+/* 事業者・配信情報 */
+.metadata-view { flex: 1; overflow: auto; padding: 16px; background: #fff; }
+.metadata-help { margin: 0 0 18px; color: #57606a; font-size: 13px; }
+.metadata-section { max-width: 900px; margin: 0 0 24px; }
+.metadata-section h2 { margin: 0 0 12px; font-size: 16px; }
+
 /* 運賃ビュー */
 .fares-view { flex: 1; overflow: auto; padding: 16px; background: #fff; }
 .fare-section { margin: 0 0 20px; }
@@ -431,6 +437,34 @@ tr.warning td:first-child { color: #b07d10; font-weight: 600; }
 .home-card-title { font-size: 17px; font-weight: 700; color: #1c2733; }
 .home-card-desc { font-size: 13px; color: #57606a; line-height: 1.5; }
 .home-card.resume { border-style: dashed; background: #f6f9ff; }
+
+@media (max-width: 900px) {
+  .header { flex-wrap: wrap; height: auto; min-height: 48px; }
+  .header .filename { max-width: 45vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tabs { overflow-x: auto; padding-left: 8px; padding-right: 8px; }
+  .tabs button { flex: 0 0 auto; }
+  .stops-view { flex-direction: column; overflow: auto; }
+  .stops-table-pane { width: 100%; min-height: 320px; max-height: 52vh; border-right: 0; border-bottom: 1px solid #ddd; }
+  .map-pane { min-height: 360px; }
+  .shapes-view { grid-template-columns: 1fr; grid-template-rows: auto minmax(360px, 1fr); overflow: auto; }
+  .shape-editor { border-right: 0; border-bottom: 1px solid #ddd; }
+  .api-import-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .new-feed-stops { overflow-x: auto; }
+  .new-feed-stops table { min-width: 720px; }
+  .release-gate-view .summary { flex-wrap: wrap; }
+}
+
+@media (max-width: 600px) {
+  .header { padding: 8px; gap: 6px; }
+  .header .spacer { display: none; }
+  .header .filename { order: 3; width: 100%; max-width: none; }
+  .form-grid, .api-import-grid { grid-template-columns: 1fr; }
+  .form-grid label.wide { grid-column: auto; }
+  .home-inner { padding: 28px 16px; }
+  .approval-api-form label, .approval-api-form label.wide { width: 100%; min-width: 0; }
+  .approval-api-form input { width: 100%; }
+  .gate-section .section-toolbar { align-items: flex-start; flex-direction: column; }
+}
 
 @media (max-width: 600px) {
   .home-grid { grid-template-columns: 1fr; }
