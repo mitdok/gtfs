@@ -128,7 +128,11 @@ for (const c of cases) {
     review: reviewStatus(c),
     importedFiles: imported.importedFiles.sort(),
     importWarnings: imported.warnings,
-    migrationWarnings: migrationWarnings.map((w) => ({ code: w.code, message: w.message })),
+    migrationWarningCount: migrationWarnings.length,
+    migrationWarningSummary: summarizeWarnings(migrationWarnings),
+    // Large real feeds can produce the same migration warning hundreds of
+    // times. Keep representative details without making summary.json unwieldy.
+    migrationWarnings: migrationWarnings.slice(0, 20).map((w) => ({ code: w.code, message: w.message })),
     internal: {
       profileId,
       summary: internal.summary,
@@ -193,6 +197,17 @@ function reviewStatus(c) {
     reviewedAt: review.reviewedAt,
     issues,
   };
+}
+
+function summarizeWarnings(warnings) {
+  const counts = new Map();
+  for (const warning of warnings) {
+    const code = warning.code ?? "unknown";
+    counts.set(code, (counts.get(code) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([code, count]) => ({ code, count }));
 }
 
 async function standardValidatorResult(c, outputZipPath, caseDir, jarPath, verbose) {
