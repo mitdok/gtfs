@@ -175,6 +175,7 @@ export function ReleaseGateView({
   }
 
   const ready = report.status === "ready";
+  const hasRevisionContext = projectId.trim() !== "" && revisionId.trim() !== "";
 
   async function loadSpecLocksFromApi() {
     try {
@@ -508,10 +509,30 @@ export function ReleaseGateView({
             <button type="button" onClick={createRevision}>
               revision保存
             </button>
-            <button type="button" onClick={publishRevision}>
+            <button
+              type="button"
+              onClick={publishRevision}
+              disabled={!ready || !hasRevisionContext}
+              title={
+                !ready
+                  ? "公開ブロッカーを解消してください"
+                  : !hasRevisionContext
+                    ? "project/revision ID が必要です"
+                    : undefined
+              }
+            >
               publish
             </button>
-            <button type="button" onClick={runPublicUrlSmoke}>
+            <button
+              type="button"
+              onClick={runPublicUrlSmoke}
+              disabled={!hasRevisionContext || publicUrl.trim() === ""}
+              title={
+                !hasRevisionContext || publicUrl.trim() === ""
+                  ? "project/revision ID と公開URLが必要です"
+                  : undefined
+              }
+            >
               smoke
             </button>
           </div>

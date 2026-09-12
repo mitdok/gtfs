@@ -262,6 +262,7 @@ export function StopsView({ feed, version, mutateFeed }: Props) {
         <div className="table-toolbar">
           <input
             className="search"
+            aria-label="停留所名・IDで検索"
             placeholder="停留所名・IDで検索"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
