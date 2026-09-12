@@ -10,7 +10,8 @@
  * - オーバーレイ専用色（ベースマップ側では使わない予約色）:
  *   停留所=#d7263d(赤系) / 選択=#1f6feb(青系)
  */
-import maplibregl from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
+import type { Feature } from "geojson";
 import type { BBox, LngLat, MapAdapter, MarkerInput, StyleRef } from "./adapter";
 
 const SRC_STOPS = "gtfs-studio:stops";
@@ -100,7 +101,7 @@ export class MapLibreAdapter implements MapAdapter {
     this.lines.set(id, points);
     const srcId = SRC_LINE_PREFIX + id;
     const lyrId = LYR_LINE_PREFIX + id;
-    const data: GeoJSON.Feature = {
+    const data: Feature = {
       type: "Feature",
       properties: {},
       geometry: { type: "LineString", coordinates: points.map((p) => [p.lng, p.lat]) },
@@ -240,7 +241,7 @@ export class MapLibreAdapter implements MapAdapter {
     if (!map) return;
     const src = map.getSource(SRC_STOPS) as maplibregl.GeoJSONSource | undefined;
     if (!src) return;
-    const features: GeoJSON.Feature[] = this.markers.map((m) => ({
+    const features: Feature[] = this.markers.map((m) => ({
       type: "Feature",
       properties: { id: m.id, label: m.label ?? "", selected: m.id === this.highlightedId },
       geometry: { type: "Point", coordinates: [m.lngLat.lng, m.lngLat.lat] },
