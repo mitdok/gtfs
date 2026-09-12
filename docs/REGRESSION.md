@@ -86,7 +86,7 @@ Web公開ゲートで使う場合:
 
 - 入力zipパス、生成zipパス
 - 取込ファイル一覧、取込警告
-- v3移行警告
+- v3移行警告の総数・コード別件数・代表例（先頭20件）
 - 内部validator summary
 - 内部validator issue（先頭20件）
 - MobilityData validator summary
