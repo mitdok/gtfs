@@ -31,11 +31,11 @@
   },
   "dependencies": {
     "fflate": "^0.8.2",
-    "gtfs-realtime-bindings": "^2.2.0"
+    "gtfs-realtime-bindings": "^3.0.0"
   },
   "devDependencies": {
-    "@types/node": "^26.6.1",
+    "@types/node": "^26.6.6",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.1"
+    "vitest": "^5.1.1"
   }
 }
